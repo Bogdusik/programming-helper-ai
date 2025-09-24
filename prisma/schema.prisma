@@ -1,0 +1,66 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  role      String   @default("user") // "user" or "admin"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sessions Session[]
+  messages Message[]
+  stats    Stats?
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  userId    String
+  role      String   // "user" or "assistant"
+  content   String
+  timestamp DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Stats {
+  id                        String   @id @default(cuid())
+  userId                    String   @unique
+  questionsAsked            Int      @default(0)
+  avgResponseTime           Float    @default(0)
+  mostFrequentResponseType  String?  // Could be "code", "explanation", "debug", etc.
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("stats")
+}
