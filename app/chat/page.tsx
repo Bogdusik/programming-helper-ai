@@ -4,6 +4,7 @@ import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import Navbar from '../../components/Navbar'
+import ChatBox from '../../components/ChatBox'
 
 export default function ChatPage() {
   const { isSignedIn, isLoaded } = useUser()
@@ -36,21 +37,7 @@ export default function ChatPage() {
       
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow-sm border h-[600px]">
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Chat Interface</h2>
-              <p className="text-gray-600 mb-4">This is where the AI chat functionality would be implemented.</p>
-              <div className="bg-gray-100 p-4 rounded-lg">
-                <p className="text-sm text-gray-700">
-                  In a full implementation, this would include:
-                  <br />• Real-time chat with AI
-                  <br />• Message history
-                  <br />• OpenAI integration
-                  <br />• Database storage
-                </p>
-              </div>
-            </div>
-          </div>
+          <ChatBox />
         </div>
       </div>
     </div>

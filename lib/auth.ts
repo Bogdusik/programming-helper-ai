@@ -1,30 +1,30 @@
-import { auth } from '@clerk/nextjs'
+import { currentUser } from '@clerk/nextjs/server'
 import { db } from './db'
 
 export async function getCurrentUser() {
-  const { userId } = await auth()
+  const user = await currentUser()
   
-  if (!userId) {
+  if (!user) {
     return null
   }
 
   // Get or create user in database
-  let user = await db.user.findUnique({
-    where: { id: userId }
+  let dbUser = await db.user.findUnique({
+    where: { id: user.id }
   })
 
-  if (!user) {
+  if (!dbUser) {
     // Create new user if doesn't exist
-    user = await db.user.create({
+    dbUser = await db.user.create({
       data: {
-        id: userId,
-        email: '', // Will be updated when we get user info from Clerk
+        id: user.id,
+        email: user.emailAddresses[0]?.emailAddress || '', // Get email from Clerk user
         role: 'user'
       }
     })
   }
 
-  return user
+  return dbUser
 }
 
 export async function isAdmin() {

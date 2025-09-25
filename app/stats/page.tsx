@@ -4,10 +4,14 @@ import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import Navbar from '../../components/Navbar'
+import { trpc } from '../../lib/trpc-client'
 
 export default function StatsPage() {
   const { isSignedIn, isLoaded } = useUser()
   const router = useRouter()
+  
+  // Load user statistics
+  const { data: stats, isLoading: statsLoading, error: statsError } = trpc.stats.getUserStats.useQuery()
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -15,7 +19,7 @@ export default function StatsPage() {
     }
   }, [isLoaded, isSignedIn, router])
 
-  if (!isLoaded) {
+  if (!isLoaded || statsLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -28,6 +32,31 @@ export default function StatsPage() {
 
   if (!isSignedIn) {
     return null
+  }
+
+  if (statsError) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Error loading statistics</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>There was an error loading your statistics. Please try again later.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -54,7 +83,7 @@ export default function StatsPage() {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Questions Asked</dt>
-                    <dd className="text-lg font-medium text-gray-900">5</dd>
+                    <dd className="text-lg font-medium text-gray-900">{stats?.questionsAsked || 0}</dd>
                   </dl>
                 </div>
               </div>
@@ -74,7 +103,7 @@ export default function StatsPage() {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Avg Response Time</dt>
-                    <dd className="text-lg font-medium text-gray-900">2.5s</dd>
+                    <dd className="text-lg font-medium text-gray-900">{stats?.avgResponseTime ? `${stats.avgResponseTime.toFixed(1)}s` : '0s'}</dd>
                   </dl>
                 </div>
               </div>
@@ -94,7 +123,7 @@ export default function StatsPage() {
                 <div className="ml-5 w-0 flex-1">
                   <dl>
                     <dt className="text-sm font-medium text-gray-500 truncate">Most Frequent Type</dt>
-                    <dd className="text-lg font-medium text-gray-900">Code</dd>
+                    <dd className="text-lg font-medium text-gray-900">{stats?.mostFrequentResponseType || 'None'}</dd>
                   </dl>
                 </div>
               </div>
@@ -106,7 +135,7 @@ export default function StatsPage() {
           <div className="bg-white shadow rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Activity Summary</h3>
             <p className="text-gray-600">
-              You've asked 5 questions and received helpful AI assistance. Keep up the great work!
+              You've asked {stats?.questionsAsked || 0} questions and received helpful AI assistance. Keep up the great work!
             </p>
           </div>
         </div>
