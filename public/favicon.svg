@@ -1,0 +1,31 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="#1e293b"/>
+  
+  <!-- Logo Icon -->
+  <g transform="translate(8, 8)">
+    <!-- Left chevron -->
+    <path 
+      d="M4 4L2 8L4 12" 
+      stroke="#10b981" 
+      stroke-width="2" 
+      stroke-linecap="round" 
+      stroke-linejoin="round"
+    />
+    <!-- Vertical bar -->
+    <path 
+      d="M8 4V12" 
+      stroke="#10b981" 
+      stroke-width="2" 
+      stroke-linecap="round"
+    />
+    <!-- Right chevron -->
+    <path 
+      d="M12 4L14 8L12 12" 
+      stroke="#10b981" 
+      stroke-width="2" 
+      stroke-linecap="round" 
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>

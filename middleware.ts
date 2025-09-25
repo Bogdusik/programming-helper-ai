@@ -3,11 +3,18 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 const isProtectedRoute = createRouteMatcher([
   '/chat(.*)',
   '/stats(.*)',
-  '/admin(.*)',
-  '/api/trpc(.*)'
+  '/admin(.*)'
+])
+
+const isPublicApiRoute = createRouteMatcher([
+  '/api/trpc/stats.getGlobalStats(.*)'
 ])
 
 export default clerkMiddleware((auth, req) => {
+  // Skip protection for public API routes
+  if (isPublicApiRoute(req)) return
+  
+  // Protect other routes
   if (isProtectedRoute(req)) auth.protect()
 })
 

@@ -90,6 +90,51 @@ export const appRouter = router({
 
         return stats
       }),
+
+    getGlobalStats: publicProcedure
+      .query(async () => {
+        try {
+          // Get total users
+          const totalUsers = await db.user.count()
+          
+          // Get total messages (questions asked)
+          const totalMessages = await db.message.count({
+            where: { role: 'user' }
+          })
+          
+          // Get total responses
+          const totalResponses = await db.message.count({
+            where: { role: 'assistant' }
+          })
+
+          // Get active users (users who have asked at least one question)
+          const activeUsers = await db.user.count({
+            where: {
+              messages: {
+                some: {
+                  role: 'user'
+                }
+              }
+            }
+          })
+
+          return {
+            totalUsers,
+            activeUsers,
+            totalQuestions: totalMessages,
+            totalSolutions: totalResponses
+          }
+        } catch (error) {
+          console.error('Error fetching global stats:', error)
+          // Return default values if database is unavailable
+          return {
+            totalUsers: 0,
+            activeUsers: 0,
+            totalQuestions: 0,
+            totalSolutions: 0
+          }
+        }
+      }),
   }),
 })
 
