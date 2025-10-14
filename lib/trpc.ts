@@ -3,6 +3,9 @@ import { z } from 'zod'
 import { db } from './db'
 import { getCurrentUser } from './auth'
 import { generateResponse, generateChatTitle, analyzeQuestionType } from './openai'
+import { rateLimit } from './rate-limit'
+import { logger } from './logger'
+import { trackUserAction, trackError } from './analytics'
 
 const t = initTRPC.create()
 
@@ -95,12 +98,31 @@ export const appRouter = router({
     // Messages
     sendMessage: protectedProcedure
       .input(z.object({ 
-        message: z.string().min(1),
+        message: z.string()
+          .min(1, "Message cannot be empty")
+          .max(2000, "Message too long (max 2000 characters)")
+          .regex(/^[\s\S]*$/, "Invalid characters in message")
+          .transform((msg) => msg.trim()),
         sessionId: z.string().optional()
       }))
       .mutation(async ({ input, ctx }) => {
         const { message, sessionId } = input
         const { user } = ctx
+
+        // Rate limiting: 10 requests per minute per user
+        const rateLimitResult = rateLimit(user.id, 10, 60000)
+        if (!rateLimitResult.success) {
+          logger.warn('Rate limit exceeded', user.id, { 
+            remaining: rateLimitResult.remaining,
+            resetTime: rateLimitResult.resetTime 
+          })
+          trackUserAction('rate_limit_exceeded', user.id)
+          
+          throw new TRPCError({
+            code: 'TOO_MANY_REQUESTS',
+            message: `Rate limit exceeded. Try again in ${Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)} seconds.`
+          })
+        }
 
         let currentSessionId = sessionId
 
@@ -131,6 +153,17 @@ export const appRouter = router({
         const startTime = Date.now()
         const response = await generateResponse(message)
         const responseTime = (Date.now() - startTime) / 1000 // Convert to seconds
+        
+        // Log successful message
+        logger.info('Message sent successfully', user.id, { 
+          messageLength: message.length,
+          responseTime,
+          sessionId: currentSessionId 
+        })
+        trackUserAction('message_sent', user.id, { 
+          messageLength: message.length,
+          responseTime 
+        })
         
         // Analyze question type
         const questionType = await analyzeQuestionType(message)

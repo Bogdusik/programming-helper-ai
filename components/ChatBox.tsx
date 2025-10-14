@@ -199,6 +199,24 @@ export default function ChatBox({ sessionId, onSessionCreated }: ChatBoxProps) {
             </div>
           </div>
         )}
+        
+        {sendMessageMutation.error && (
+          <div className="flex justify-start">
+            <div className="bg-gradient-to-r from-red-500/20 to-red-600/20 text-white px-6 py-4 rounded-2xl rounded-bl-md border border-red-500/30">
+              <div className="flex items-center space-x-2">
+                <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm">
+                  {sendMessageMutation.error.message.includes('Rate limit') 
+                    ? 'Too many requests. Please wait a moment.'
+                    : 'Failed to send message. Please try again.'
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="p-6 border-t border-white/10">

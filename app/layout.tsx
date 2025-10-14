@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs'
 import TRPCProvider from '../components/TRPCProvider'
 import Footer from '../components/Footer'
+import ErrorBoundary from '../components/ErrorBoundary'
 import "./globals.css";
 
 const geistSans = Geist({
@@ -37,14 +38,16 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          <TRPCProvider>
-            <div className="min-h-screen flex flex-col">
-              <main className="flex-1">
-                {children}
-              </main>
-              <Footer />
-            </div>
-          </TRPCProvider>
+          <ErrorBoundary>
+            <TRPCProvider>
+              <div className="min-h-screen flex flex-col">
+                <main className="flex-1">
+                  {children}
+                </main>
+                <Footer />
+              </div>
+            </TRPCProvider>
+          </ErrorBoundary>
         </body>
       </html>
     </ClerkProvider>
