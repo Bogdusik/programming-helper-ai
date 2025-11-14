@@ -1,10 +1,13 @@
+import { memo } from 'react'
+
 interface MessageProps {
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
 }
 
-export default function Message({ role, content, timestamp }: MessageProps) {
+// OPTIMIZATION: Memoize Message component to prevent unnecessary re-renders
+const Message = memo(function Message({ role, content, timestamp }: MessageProps) {
   const isUser = role === 'user'
   
   return (
@@ -41,4 +44,6 @@ export default function Message({ role, content, timestamp }: MessageProps) {
       </div>
     </div>
   )
-}
+})
+
+export default Message

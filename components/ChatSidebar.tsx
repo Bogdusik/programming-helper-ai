@@ -28,6 +28,7 @@ export default function ChatSidebar({ currentSessionId, onSessionSelect, onNewCh
   const [isEditing, setIsEditing] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
 
+  const utils = trpc.useUtils()
   const { data: sessions = [], refetch: refetchSessions } = trpc.chat.getSessions.useQuery()
   const deleteSessionMutation = trpc.chat.deleteSession.useMutation()
   const updateTitleMutation = trpc.chat.updateSessionTitle.useMutation()
@@ -57,12 +58,21 @@ export default function ChatSidebar({ currentSessionId, onSessionSelect, onNewCh
     
     toast.promise(deletePromise, {
       loading: 'Deleting chat...',
-      success: () => {
+      success: (result) => {
         refetchSessions()
+        // Invalidate tasks and stats queries to update UI
+        utils.task.getTasks.invalidate()
+        utils.task.getTaskProgress.invalidate()
+        utils.stats.getUserStats.invalidate()
+        
         if (currentSessionId === sessionId) {
           onNewChat()
         }
-        return 'Chat deleted successfully'
+        
+        const message = result.tasksReset > 0 
+          ? `Chat deleted. ${result.tasksReset} task(s) reset to "Start Task".`
+          : 'Chat deleted successfully'
+        return message
       },
       error: (error: unknown) => {
         console.error('Error deleting session:', error)
@@ -113,7 +123,7 @@ export default function ChatSidebar({ currentSessionId, onSessionSelect, onNewCh
   }
 
   return (
-    <div className="w-80 bg-slate-900/50 border-r border-white/10 flex flex-col h-full relative z-10">
+    <div className="w-80 bg-slate-900/50 border-r border-white/10 flex flex-col h-full min-h-0 relative z-10 flex-shrink-0">
       {/* Header */}
       <div className="p-4 border-b border-white/10">
         <button

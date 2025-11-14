@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import Message from './Message'
 import { trpc } from '../lib/trpc-client'
 
 interface ChatBoxProps {
   sessionId?: string
+  taskId?: string
   onSessionCreated?: (sessionId: string) => void
+  onTaskComplete?: (taskId: string) => void
 }
 
-export default function ChatBox({ sessionId, onSessionCreated }: ChatBoxProps) {
+export default function ChatBox({ sessionId, taskId, onSessionCreated, onTaskComplete }: ChatBoxProps) {
   const [message, setMessage] = useState('')
   const [optimisticMessages, setOptimisticMessages] = useState<Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: Date }>>([])
   const [isUserAtBottom, setIsUserAtBottom] = useState(true)
@@ -18,16 +20,93 @@ export default function ChatBox({ sessionId, onSessionCreated }: ChatBoxProps) {
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   
   const sendMessageMutation = trpc.chat.sendMessage.useMutation()
-  const { data: messages = [], refetch: refetchMessages } = trpc.chat.getMessages.useQuery(
+  const { data: messages = [], refetch: refetchMessages, isLoading: isLoadingMessages } = trpc.chat.getMessages.useQuery(
     { sessionId },
-    { enabled: !!sessionId }
+    { 
+      enabled: !!sessionId,
+      // Refetch on mount to ensure messages are loaded when opening existing session
+      refetchOnMount: true,
+      refetchOnWindowFocus: false,
+    }
+  )
+  
+  // Get task data if taskId is provided
+  const { data: taskData } = trpc.task.getTask.useQuery(
+    { taskId: taskId!, includeProgress: false },
+    { enabled: !!taskId }
+  )
+  
+  // Also try to get task from session if no taskId but sessionId exists
+  // Get all task progress and find one that matches the sessionId
+  // Only load if sessionId exists and no explicit taskId (to avoid showing task in new chats)
+  const { data: allTaskProgress, refetch: refetchAllTaskProgress } = trpc.task.getTaskProgress.useQuery(
+    { taskId: undefined },
+    { 
+      enabled: !!sessionId && !taskId,
+      // Refetch when sessionId changes to get updated task associations
+      refetchOnMount: true,
+    }
+  )
+  
+  // OPTIMIZATION: Memoize task progress calculations to avoid unnecessary recalculations
+  const associatedProgress = useMemo(() => {
+    if (!sessionId) return null
+    return allTaskProgress?.find(progress => {
+      const matchesSession = progress.chatSessionId === sessionId
+      if (taskId) {
+        return matchesSession && progress.taskId === taskId
+      }
+      return matchesSession && progress.status !== 'completed'
+    }) || null
+  }, [sessionId, taskId, allTaskProgress])
+  
+  const associatedTask = useMemo(() => associatedProgress?.task, [associatedProgress])
+  
+  const shouldUseTaskId = useMemo(() => 
+    taskId && associatedProgress && associatedProgress.taskId === taskId,
+    [taskId, associatedProgress]
+  )
+  
+  const currentTask = useMemo(() => 
+    shouldUseTaskId ? taskData : (sessionId ? associatedTask : null),
+    [shouldUseTaskId, taskData, sessionId, associatedTask]
+  )
+  
+  const effectiveTaskId = useMemo(() => 
+    shouldUseTaskId ? taskId : (sessionId ? (associatedTask?.id || associatedProgress?.taskId) : null),
+    [shouldUseTaskId, taskId, sessionId, associatedTask, associatedProgress]
+  )
+  
+  // Get task progress for current task to show stats
+  const utils = trpc.useUtils()
+  const { data: taskProgressData, refetch: refetchTaskProgress } = trpc.task.getTaskProgress.useQuery(
+    { taskId: effectiveTaskId || '' },
+    { enabled: !!effectiveTaskId }
+  )
+  const taskProgress = taskProgressData?.[0]
+  
+  // OPTIMIZATION: Memoize computed values
+  const isTaskCompleted = useMemo(() => 
+    taskProgress?.status === 'completed',
+    [taskProgress?.status]
+  )
+  
+  const timeSpent = useMemo(() => 
+    taskProgress?.createdAt 
+      ? Math.floor((new Date().getTime() - new Date(taskProgress.createdAt).getTime()) / 1000 / 60)
+      : 0,
+    [taskProgress?.createdAt]
   )
 
-  // Use optimistic messages when available, otherwise use server messages
-  const displayMessages = optimisticMessages.length > 0 ? optimisticMessages : messages
+  const displayMessages = useMemo(() => 
+    optimisticMessages.length > 0 && sendMessageMutation.isPending 
+      ? optimisticMessages 
+      : messages,
+    [optimisticMessages, sendMessageMutation.isPending, messages]
+  )
 
-  // Function to scroll to bottom with smooth animation
-  const scrollToBottom = () => {
+  // OPTIMIZATION: Memoize scroll function to avoid recreating on every render
+  const scrollToBottom = useCallback(() => {
     if (isUserAtBottom && messagesContainerRef.current) {
       const container = messagesContainerRef.current
       const targetScrollTop = container.scrollHeight
@@ -54,21 +133,33 @@ export default function ChatBox({ sessionId, onSessionCreated }: ChatBoxProps) {
       
       requestAnimationFrame(animateScroll)
     }
-  }
+  }, [isUserAtBottom])
 
-  // Check if user is at bottom of chat
-  const handleScroll = () => {
+  // OPTIMIZATION: Memoize scroll handler
+  const handleScroll = useCallback(() => {
     if (messagesContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current
       const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10 // 10px threshold
       setIsUserAtBottom(isAtBottom)
     }
-  }
+  }, [])
 
-  // Clear optimistic messages when session changes
+  // Clear optimistic messages and refetch when session changes
   useEffect(() => {
-    setOptimisticMessages([])
-  }, [sessionId])
+    if (sessionId) {
+      setOptimisticMessages([])
+      // Force refetch messages when session changes (e.g., opening existing session)
+      refetchMessages()
+      // Refetch task progress to get updated task associations for the new session
+      if (!taskId) {
+        refetchAllTaskProgress()
+      }
+    } else {
+      // Clear optimistic messages when session is cleared
+      setOptimisticMessages([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, taskId])
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -90,7 +181,8 @@ export default function ChatBox({ sessionId, onSessionCreated }: ChatBoxProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]) // Only depend on sessionId, not refetchMessages to avoid re-adding listeners
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // OPTIMIZATION: Memoize submit handler
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     if (!message.trim() || sendMessageMutation.isPending) return
 
@@ -124,8 +216,10 @@ export default function ChatBox({ sessionId, onSessionCreated }: ChatBoxProps) {
       // Refresh messages to show the complete conversation
       await refetchMessages()
       
-      // Clear optimistic messages since we now have real data
-      setOptimisticMessages([])
+      // Clear optimistic messages after a short delay to ensure smooth transition
+      setTimeout(() => {
+        setOptimisticMessages([])
+      }, 100)
       
       // Scroll to bottom after new message
       setTimeout(() => scrollToBottom(), 100)
@@ -137,25 +231,53 @@ export default function ChatBox({ sessionId, onSessionCreated }: ChatBoxProps) {
       // Remove the optimistic message on error
       setOptimisticMessages(prev => prev.filter(msg => msg.id !== userMessage.id))
     }
-  }
+  }, [message, sendMessageMutation, sessionId, onSessionCreated, refetchMessages, scrollToBottom])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0" style={{ height: '100%', minHeight: 0, maxHeight: '100%' }}>
       <div 
         ref={messagesContainerRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth"
         style={{ scrollBehavior: 'smooth' }}
       >
-        {displayMessages?.length === 0 && (
+        {(!displayMessages || displayMessages.length === 0) && !isLoadingMessages && (
           <div className="text-center py-12">
-            <div className="inline-flex items-center justify-center p-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl mb-4">
-              <svg className="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-white mb-2">Welcome to AI Programming Assistant</h3>
-            <p className="text-white/60">Ask me anything about programming, debugging, or learning new concepts!</p>
+            {currentTask ? (
+              // Task-specific welcome message
+              <div className="max-w-2xl mx-auto">
+                <div className="inline-flex items-center justify-center p-4 bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-2xl mb-4">
+                  <svg className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-semibold text-white mb-3">{currentTask.title}</h3>
+                <div className="flex flex-wrap gap-2 justify-center mb-4">
+                  <span className="px-3 py-1 bg-blue-500/20 text-blue-300 text-sm rounded-full capitalize">
+                    {currentTask.language}
+                  </span>
+                  <span className="px-3 py-1 bg-purple-500/20 text-purple-300 text-sm rounded-full capitalize">
+                    {currentTask.difficulty}
+                  </span>
+                  <span className="px-3 py-1 bg-orange-500/20 text-orange-300 text-sm rounded-full capitalize">
+                    {currentTask.category}
+                  </span>
+                </div>
+                <p className="text-white/80 text-lg mb-4 leading-relaxed">{currentTask.description}</p>
+                <p className="text-white/50 text-sm">Work on this task with AI assistance. Ask questions, get hints, or request code reviews!</p>
+              </div>
+            ) : (
+              // Default welcome message
+              <div>
+                <div className="inline-flex items-center justify-center p-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl mb-4">
+                  <svg className="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">Welcome to AI Programming Assistant</h3>
+                <p className="text-white/60">Ask me anything about programming, debugging, or learning new concepts!</p>
+              </div>
+            )}
           </div>
         )}
         
@@ -219,35 +341,117 @@ export default function ChatBox({ sessionId, onSessionCreated }: ChatBoxProps) {
       </div>
 
       <form onSubmit={handleSubmit} className="p-6 border-t border-white/10">
-        <div className="flex space-x-3">
-          <input
-            type="text"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Ask me anything about programming..."
-            className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200"
-            disabled={sendMessageMutation.isPending}
-            data-tour="chat-input"
-          />
-          <button
-            type="submit"
-            disabled={!message.trim() || sendMessageMutation.isPending}
-            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl font-medium transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
-          >
-            {sendMessageMutation.isPending ? (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                <span>Sending...</span>
+        <div className="flex flex-col space-y-3">
+          <div className="flex space-x-3">
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Ask me anything about programming..."
+              className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-2xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200"
+              disabled={sendMessageMutation.isPending}
+              data-tour="chat-input"
+            />
+            <button
+              type="submit"
+              disabled={!message.trim() || sendMessageMutation.isPending}
+              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-2xl font-medium transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
+            >
+              {sendMessageMutation.isPending ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  <span>Sending...</span>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                  <span>Send</span>
+                </div>
+              )}
+            </button>
+          </div>
+          {currentTask && onTaskComplete && effectiveTaskId && (
+            <div className="mt-4 pt-4 border-t border-white/10">
+              {/* Task Info Panel */}
+              <div className="mb-3 p-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-white/10">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    {isTaskCompleted ? (
+                      <>
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-sm font-medium text-green-400">Task completed</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        <span className="text-sm font-medium text-white">Working on task</span>
+                      </>
+                    )}
+                  </div>
+                  <span className="text-xs text-white/60 capitalize">{currentTask.difficulty}</span>
+                </div>
+                <h4 className="text-sm font-semibold text-white mb-2">{currentTask.title}</h4>
+                <div className="flex items-center gap-4 text-xs text-white/70">
+                  {timeSpent > 0 && (
+                    <div className="flex items-center space-x-1">
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>{timeSpent} min</span>
+                    </div>
+                  )}
+                  {messages.length > 0 && (
+                    <div className="flex items-center space-x-1">
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      <span>{messages.length} messages</span>
+                    </div>
+                  )}
+                  {taskProgress?.attempts > 0 && (
+                    <div className="flex items-center space-x-1">
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      <span>{taskProgress.attempts} attempt{taskProgress.attempts !== 1 ? 's' : ''}</span>
+                    </div>
+                  )}
+                </div>
               </div>
-            ) : (
-              <div className="flex items-center space-x-2">
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-                <span>Send</span>
-              </div>
-            )}
-          </button>
+              
+              {/* Complete Button */}
+              {!isTaskCompleted ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (effectiveTaskId && onTaskComplete) {
+                      if (confirm('Are you sure you want to mark this task as complete?')) {
+                        await onTaskComplete(effectiveTaskId)
+                        // Invalidate and refetch task progress to update UI
+                        await utils.task.getTaskProgress.invalidate({ taskId: effectiveTaskId })
+                        await refetchTaskProgress()
+                      }
+                    }
+                  }}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl text-sm font-medium transition-all duration-200 hover:shadow-lg hover:shadow-green-500/25 flex items-center justify-center space-x-2"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>Mark Task as Complete</span>
+                </button>
+              ) : (
+                <div className="w-full px-4 py-3 bg-gradient-to-r from-green-600/50 to-green-700/50 text-green-300 rounded-xl text-sm font-medium flex items-center justify-center space-x-2 cursor-not-allowed">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>Task Completed</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </form>
     </div>

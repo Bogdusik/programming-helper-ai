@@ -57,7 +57,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-900 relative">
       <Navbar />
       
       {/* Research Consent Modal */}
@@ -69,7 +69,9 @@ export default function Home() {
       {/* Optimized simple background */}
       <SimpleBackground />
       
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      {/* Sections with snap points - используем обычный скролл страницы */}
+      {/* Hero Section - Section 1 (не трогаем, идеален) */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden snap-start">
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center animate-fadeInUp">
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold text-white mb-6">
@@ -103,10 +105,13 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="relative py-16">
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-white mb-4">Our Impact in Numbers</h2>
+        {/* Section 2: Stats + Features - должны полностью помещаться на экране */}
+        <section className="relative min-h-screen flex flex-col justify-center snap-start">
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-16">
+            {/* Our Impact in Numbers */}
+            <div className="mb-12">
+              <div className="text-center mb-10">
+                <h2 className="text-4xl font-bold text-white mb-4">Our Impact in Numbers</h2>
             <p className="text-white/60">Growing community of developers</p>
             {!statsLoading && globalStats && !statsError && (
               <div className="flex items-center justify-center space-x-2 mt-4">
@@ -182,17 +187,16 @@ export default function Home() {
               <div className="text-white/60">Solutions Provided</div>
             </div>
           </div>
-        </div>
-      </section>
+            </div>
 
-      <section className="relative py-16">
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-white mb-6">Redefining programming experience</h2>
-            <p className="text-xl text-white/70 max-w-3xl mx-auto">Programming Helper AI makes coding assistance simple again</p>
-          </div>
+            {/* Redefining programming experience */}
+            <div>
+              <div className="text-center mb-10">
+                <h2 className="text-4xl font-bold text-white mb-6">Redefining programming experience</h2>
+                <p className="text-xl text-white/70 max-w-3xl mx-auto">Programming Helper AI makes coding assistance simple again</p>
+              </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <ViteStyleCard
               title="Instant AI Response"
               description="On demand AI assistance, no waiting required! Get instant help with your programming questions."
@@ -242,18 +246,19 @@ export default function Home() {
               codeExample="ai.optimize(solution) // Returns optimized code"
               features={["Best practices", "Performance tips", "Clean code patterns"]}
             />
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* A shared foundation to build upon */}
-      <section className="relative py-20">
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-white mb-6">A shared foundation to build upon</h2>
-          </div>
+        {/* Section 3: A shared foundation - отдельная секция, полностью видимая */}
+        <section className="relative min-h-screen flex flex-col justify-center snap-start">
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-16">
+            <div className="text-center mb-10">
+              <h2 className="text-4xl font-bold text-white mb-6">A shared foundation to build upon</h2>
+            </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <ViteStyleCard
               title="Flexible AI System"
               description="Our AI extends with well-designed interfaces and a few extra programming-specific options. Built for extensibility."
@@ -293,95 +298,130 @@ export default function Home() {
               features={["Step-by-step guidance", "Concept explanations", "Best practices"]}
             />
           </div>
-        </div>
-      </section>
-
-      {/* Loved by the community */}
-      <section className="relative py-20">
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-white mb-6">Loved by the community</h2>
-            <p className="text-xl text-white/70 max-w-3xl mx-auto">Don&apos;t take our word for it - listen to what our users have to say.</p>
           </div>
+        </section>
+
+        {/* Section 4: Testimonials + CTA - должны полностью помещаться на экране */}
+        {/* Убираем snap-start с последней секции, чтобы можно было прокрутить дальше к футеру */}
+        <section className="relative min-h-screen flex flex-col overflow-hidden">
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-16">
+            {/* Loved by the community */}
+            <div className="mb-12">
+              <div className="text-center mb-10 animate-fadeInUp">
+                <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-white via-blue-100 to-purple-100 bg-clip-text text-transparent">
+                  Loved by the community
+                </h2>
+                <p className="text-lg text-white/70 max-w-3xl mx-auto">Don&apos;t take our word for it - listen to what our users have to say.</p>
+              </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="glass rounded-2xl p-8 card-hover">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                  RC
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Testimonial 1 */}
+            <div className="glass rounded-2xl p-6 card-hover group relative overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-green-500/20 animate-fadeInUp" style={{ animationDelay: '0.1s' }}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-500/10 to-transparent rounded-full blur-2xl"></div>
+              <div className="relative">
+                <div className="flex items-center mb-3">
+                  <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-base shadow-lg shadow-green-500/30 group-hover:scale-110 transition-transform duration-300">
+                    RC
+                  </div>
+                  <div className="ml-3">
+                    <h4 className="text-white font-semibold text-base">Ryan Carniato</h4>
+                    <p className="text-white/60 text-xs">@RyanCarniato</p>
+                  </div>
                 </div>
-                <div className="ml-4">
-                  <h4 className="text-white font-semibold">Ryan Carniato</h4>
-                  <p className="text-white/60 text-sm">@RyanCarniato</p>
+                <div className="flex mb-2">
+                  {[...Array(5)].map((_, i) => (
+                    <svg key={i} className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                      <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                    </svg>
+                  ))}
                 </div>
+                <p className="text-white/80 italic leading-relaxed relative z-10 text-sm">
+                  &quot;I&apos;m loving what Programming Helper AI enables. We&apos;ve found building with it that it is less a tool but a system of symbiotic AI assistance. While built with programming in mind, it should scale from our simplest questions to complex debugging.&quot;
+                </p>
               </div>
-              <p className="text-white/80 italic">
-                &quot;I&apos;m loving what Programming Helper AI enables. We&apos;ve found building with it that it is less a tool but a system of symbiotic AI assistance. While built with programming in mind, it should scale from our simplest questions to complex debugging.&quot;
-              </p>
             </div>
 
-            <div className="glass rounded-2xl p-8 card-hover">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                  RH
+            {/* Testimonial 2 */}
+            <div className="glass rounded-2xl p-6 card-hover group relative overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/20 animate-fadeInUp" style={{ animationDelay: '0.2s' }}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full blur-2xl"></div>
+              <div className="relative">
+                <div className="flex items-center mb-3">
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-base shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform duration-300">
+                    RH
+                  </div>
+                  <div className="ml-3">
+                    <h4 className="text-white font-semibold text-base">Rich Harris</h4>
+                    <p className="text-white/60 text-xs">@Rich_Harris</p>
+                  </div>
                 </div>
-                <div className="ml-4">
-                  <h4 className="text-white font-semibold">Rich Harris</h4>
-                  <p className="text-white/60 text-sm">@Rich_Harris</p>
+                <div className="flex mb-2">
+                  {[...Array(5)].map((_, i) => (
+                    <svg key={i} className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                      <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                    </svg>
+                  ))}
                 </div>
+                <p className="text-white/80 italic leading-relaxed relative z-10 text-sm">
+                  &quot;Programming Helper AI is basically the united nations of programming assistance at this point. I&apos;ll be there as a representative of JavaScript developers.&quot;
+                </p>
               </div>
-              <p className="text-white/80 italic">
-                &quot;Programming Helper AI is basically the united nations of programming assistance at this point. I&apos;ll be there as a representative of JavaScript developers.&quot;
-              </p>
             </div>
 
-            <div className="glass rounded-2xl p-8 card-hover">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                  DE
+            {/* Testimonial 3 */}
+            <div className="glass rounded-2xl p-6 card-hover group relative overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/20 animate-fadeInUp" style={{ animationDelay: '0.3s' }}>
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-500/10 to-transparent rounded-full blur-2xl"></div>
+              <div className="relative">
+                <div className="flex items-center mb-3">
+                  <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-base shadow-lg shadow-purple-500/30 group-hover:scale-110 transition-transform duration-300">
+                    DE
+                  </div>
+                  <div className="ml-3">
+                    <h4 className="text-white font-semibold text-base">David East</h4>
+                    <p className="text-white/60 text-xs">@_davideast</p>
+                  </div>
                 </div>
-                <div className="ml-4">
-                  <h4 className="text-white font-semibold">David East</h4>
-                  <p className="text-white/60 text-sm">@_davideast</p>
+                <div className="flex mb-2">
+                  {[...Array(5)].map((_, i) => (
+                    <svg key={i} className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                      <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                    </svg>
+                  ))}
                 </div>
+                <p className="text-white/80 italic leading-relaxed relative z-10 text-sm">
+                  &quot;Each and every time I use Programming Helper AI, I feel a true sense of pure and unbridled joy.&quot;
+                </p>
               </div>
-              <p className="text-white/80 italic">
-                &quot;Each and every time I use Programming Helper AI, I feel a true sense of pure and unbridled joy.&quot;
-              </p>
+            </div>
+            </div>
+            </div>
+
+            {/* CTA Section */}
+            <div className="relative max-w-4xl mx-auto text-center">
+              <div className="glass rounded-3xl p-10">
+                <h2 className="text-4xl font-bold text-white mb-6">Ready to Level Up Your Coding?</h2>
+                <p className="text-white/70 text-lg mb-8 max-w-2xl mx-auto">
+                  Join thousands of developers who are already using our AI assistant to solve problems faster and learn more effectively.
+                </p>
+                {!isLoaded ? (
+                  <div className="animate-pulse-slow bg-white/20 h-14 w-64 rounded-full mx-auto"></div>
+                ) : isSignedIn ? (
+                  <Link 
+                    href="/chat"
+                    className="inline-block bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-8 py-4 rounded-full text-lg font-semibold transition-all duration-200 hover:shadow-xl hover:shadow-green-500/25 hover:scale-105"
+                  >
+                    Start Chatting Now
+                  </Link>
+                ) : (
+                  <SignInButton mode="modal">
+                    <button className="inline-block bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-8 py-4 rounded-full text-lg font-semibold transition-all duration-200 hover:shadow-xl hover:shadow-green-500/25 hover:scale-105">
+                      Get Started Free
+                    </button>
+                  </SignInButton>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="relative py-16">
-        <div className="relative max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <div className="glass rounded-3xl p-12">
-            <h2 className="text-3xl font-bold text-white mb-6">Ready to Level Up Your Coding?</h2>
-            <p className="text-white/70 text-lg mb-8 max-w-2xl mx-auto">
-              Join thousands of developers who are already using our AI assistant to solve problems faster and learn more effectively.
-            </p>
-            {!isLoaded ? (
-              <div className="animate-pulse-slow bg-white/20 h-14 w-64 rounded-full mx-auto"></div>
-            ) : isSignedIn ? (
-              <Link 
-                href="/chat"
-                className="inline-block bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-8 py-4 rounded-full text-lg font-semibold transition-all duration-200 hover:shadow-xl hover:shadow-green-500/25 hover:scale-105"
-              >
-                Start Chatting Now
-              </Link>
-            ) : (
-              <SignInButton mode="modal">
-                <button className="inline-block bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-8 py-4 rounded-full text-lg font-semibold transition-all duration-200 hover:shadow-xl hover:shadow-green-500/25 hover:scale-105">
-                  Get Started Free
-                </button>
-              </SignInButton>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-transparent via-green-500 to-transparent animate-pulse"></div>
+        </section>
     </div>
   )
 }

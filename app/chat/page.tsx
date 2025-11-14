@@ -1,8 +1,8 @@
 'use client'
 
 import { useUser } from '@clerk/nextjs'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState, useMemo } from 'react'
 import Navbar from '../../components/Navbar'
 import ChatBox from '../../components/ChatBox'
 import ChatSidebar from '../../components/ChatSidebar'
@@ -12,10 +12,12 @@ import AssessmentModal, { AssessmentQuestion } from '../../components/Assessment
 import UserProfileModal, { ProfileData } from '../../components/UserProfileModal'
 import { hasGivenConsent } from '../../lib/research-consent'
 import { trpc } from '../../lib/trpc-client'
+import toast from 'react-hot-toast'
 
 export default function ChatPage() {
   const { isSignedIn, isLoaded } = useUser()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [currentSessionId, setCurrentSessionId] = useState<string | undefined>()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
@@ -23,6 +25,7 @@ export default function ChatPage() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showPreAssessment, setShowPreAssessment] = useState(false)
   const [assessmentQuestions, setAssessmentQuestions] = useState<AssessmentQuestion[]>([])
+  const [taskInitialized, setTaskInitialized] = useState(false)
   
   const { data: userProfile, refetch: refetchProfile } = trpc.profile.getProfile.useQuery(undefined, {
     enabled: isSignedIn,
@@ -36,11 +39,112 @@ export default function ChatPage() {
     enabled: isSignedIn,
   })
   
+  const utils = trpc.useUtils()
+  // Calculate chat height once and keep it fixed - use useMemo to prevent recalculation
+  const chatHeight = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768 ? 800 : 750
+    }
+    return 750
+  }, [])
+  
   const updateOnboardingMutation = trpc.onboarding.updateOnboardingStatus.useMutation()
   const updateLanguagesMutation = trpc.profile.updateLanguages.useMutation()
   const updateProfileMutation = trpc.profile.updateProfile.useMutation()
   const getQuestionsMutation = trpc.assessment.getQuestions.useMutation()
   const submitAssessmentMutation = trpc.assessment.submitAssessment.useMutation()
+  const sendMessageMutation = trpc.chat.sendMessage.useMutation()
+  const updateProgressMutation = trpc.task.updateTaskProgress.useMutation()
+  const completeTaskMutation = trpc.task.completeTask.useMutation()
+  
+  // Get task data if taskId is in URL
+  const taskId = searchParams.get('taskId')
+  const sessionIdFromUrl = searchParams.get('sessionId')
+  const { data: taskData } = trpc.task.getTask.useQuery(
+    { taskId: taskId!, includeProgress: false },
+    { enabled: !!taskId && isSignedIn }
+  )
+
+  // Handle task initialization when coming from tasks page
+  useEffect(() => {
+    if (sessionIdFromUrl) {
+      setCurrentSessionId(sessionIdFromUrl)
+      // Reset task initialization state when switching sessions
+      setTaskInitialized(false)
+    } else if (!sessionIdFromUrl && currentSessionId) {
+      // Clear session if no sessionId in URL
+      setCurrentSessionId(undefined)
+      setTaskInitialized(false)
+    }
+  }, [sessionIdFromUrl])
+
+  // Check if session has messages to determine if it's a new or existing session
+  const { data: existingMessages, isLoading: isLoadingMessages } = trpc.chat.getMessages.useQuery(
+    { sessionId: currentSessionId },
+    { enabled: !!currentSessionId && isSignedIn }
+  )
+
+  // Auto-send task description when task is loaded (only for new task starts)
+  useEffect(() => {
+    // Only send initial message if:
+    // 1. Task data is loaded
+    // 2. Session exists and messages are loaded (not loading)
+    // 3. Task is not yet initialized
+    // 4. User is signed in
+    // 5. Both taskId and sessionId are in URL (indicating new task start)
+    // 6. Session has no existing messages (it's a new session)
+    const hasNoMessages = !existingMessages || existingMessages.length === 0
+    const isNewTaskStart = taskId && sessionIdFromUrl && hasNoMessages
+    const isSessionReady = currentSessionId && !isLoadingMessages
+    
+    if (taskData && isSessionReady && !taskInitialized && isSignedIn && isNewTaskStart) {
+      // Add a small delay to ensure everything is fully loaded and rendered
+      const timer = setTimeout(() => {
+        // Double-check that messages are still empty (session wasn't populated in the meantime)
+        if (!existingMessages || existingMessages.length === 0) {
+          // Only send message if this is a new task start (both taskId and sessionId in URL, and no messages)
+          const taskMessage = `I want to work on this task:\n\n**${taskData.title}**\n\n${taskData.description}\n\nLanguage: ${taskData.language}\nDifficulty: ${taskData.difficulty}\n\nPlease help me solve this task.`
+          
+          sendMessageMutation.mutate(
+            {
+              message: taskMessage,
+              sessionId: currentSessionId,
+            },
+            {
+              onSuccess: (result) => {
+                setTaskInitialized(true)
+                // If a new session was created (session was missing), update currentSessionId
+                if (result.sessionId && result.sessionId !== currentSessionId) {
+                  setCurrentSessionId(result.sessionId)
+                  // Update task progress with new session ID
+                  if (taskId) {
+                    updateProgressMutation.mutate({
+                      taskId: taskId,
+                      chatSessionId: result.sessionId,
+                    })
+                  }
+                }
+                // Remove taskId from URL after initialization
+                const newUrl = new URL(window.location.href)
+                newUrl.searchParams.delete('taskId')
+                router.replace(newUrl.pathname + newUrl.search)
+              },
+              onError: (error) => {
+                console.error('Error sending task message:', error)
+                setTaskInitialized(true)
+              }
+            }
+          )
+        }
+      }, 500) // Wait 500ms for session to be fully ready and rendered
+      
+      return () => clearTimeout(timer)
+    } else if (taskId && !taskInitialized && !isLoadingMessages) {
+      // If taskId exists but conditions not met, mark as initialized to prevent retries
+      // Only mark as initialized if messages are loaded (not loading)
+      setTaskInitialized(true)
+    }
+  }, [taskData, currentSessionId, taskInitialized, isSignedIn, sendMessageMutation, updateProgressMutation, router, taskId, sessionIdFromUrl, existingMessages, isLoadingMessages])
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -176,10 +280,24 @@ export default function ChatPage() {
 
   const handleSessionSelect = (sessionId: string) => {
     setCurrentSessionId(sessionId)
+    setTaskInitialized(false)
+    // Clear taskId from URL when selecting an existing chat
+    // The task will be found automatically from the session's associated task progress
+    const newUrl = new URL(window.location.href)
+    newUrl.searchParams.delete('taskId')
+    // Update sessionId in URL to reflect the selected session
+    newUrl.searchParams.set('sessionId', sessionId)
+    router.replace(newUrl.pathname + newUrl.search)
   }
 
   const handleNewChat = () => {
     setCurrentSessionId(undefined)
+    setTaskInitialized(false)
+    // Clear taskId from URL
+    const newUrl = new URL(window.location.href)
+    newUrl.searchParams.delete('taskId')
+    newUrl.searchParams.delete('sessionId')
+    router.replace(newUrl.pathname + newUrl.search)
   }
 
   const handleSessionCreated = (sessionId: string) => {
@@ -213,7 +331,15 @@ export default function ChatPage() {
           isOpen={showProfileModal}
           onClose={() => setShowProfileModal(false)}
           onComplete={handleProfileComplete}
-          isOptional={false}
+          isOptional={userProfile?.profileCompleted || false}
+          initialData={userProfile ? {
+            experience: userProfile.selfReportedLevel || '',
+            focusAreas: userProfile.learningGoals || [],
+            confidence: userProfile.initialConfidence || 3,
+            aiExperience: userProfile.aiExperience || '',
+            preferredLanguages: userProfile.preferredLanguages || [],
+            primaryLanguage: userProfile.primaryLanguage,
+          } : undefined}
         />
       )}
 
@@ -238,11 +364,11 @@ export default function ChatPage() {
         />
       )}
       
-      <div className="pt-20 pb-8 min-h-[calc(100vh-5rem)] flex flex-col justify-center">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex-1 flex flex-col">
-          <div className="text-center mb-4">
-            <h1 className="text-4xl font-bold text-white mb-2">AI Programming Assistant</h1>
-            <p className="text-white/70 text-lg mb-4">Get instant help with your coding questions</p>
+      <div className="pt-20 pb-8 min-h-[calc(100vh-5rem)] flex flex-col" style={{ minHeight: 'calc(100vh - 5rem)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex-1 flex flex-col justify-center" style={{ minHeight: 0, height: '100%' }}>
+          <div className="text-center mb-2 flex-shrink-0">
+            <h1 className="text-4xl font-bold text-white mb-1">AI Programming Assistant</h1>
+            <p className="text-white/70 text-lg mb-2">Get instant help with your coding questions</p>
             {/* Language Selector */}
             {userProfile && (
               <div className="flex justify-center mb-4" data-tour="language-selector">
@@ -256,8 +382,21 @@ export default function ChatPage() {
             )}
           </div>
           
-          <div className="flex-1 flex justify-center items-center">
-            <div className="flex h-[600px] md:h-[700px] w-full max-w-6xl glass rounded-3xl shadow-2xl border border-white/10 overflow-hidden relative">
+          <div className="flex justify-center items-center flex-shrink-0 w-full" style={{ height: `${chatHeight}px`, minHeight: `${chatHeight}px`, maxHeight: `${chatHeight}px` }}>
+            <div 
+              className="flex w-full max-w-7xl glass rounded-3xl shadow-2xl border border-white/10 overflow-hidden relative" 
+              style={{ 
+                height: `${chatHeight}px`,
+                minHeight: `${chatHeight}px`,
+                maxHeight: `${chatHeight}px`,
+                width: '100%',
+                maxWidth: '1280px',
+                flexShrink: 0,
+                flexGrow: 0,
+                boxSizing: 'border-box',
+                position: 'relative'
+              }}
+            >
             {/* Sidebar */}
             {sidebarOpen && (
               <div data-tour="chat-sessions">
@@ -271,7 +410,7 @@ export default function ChatPage() {
             )}
             
             {/* Chat Area */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden" style={{ height: '100%', minHeight: 0, maxHeight: '100%', overflow: 'hidden' }}>
               {/* Mobile sidebar toggle */}
               <div className="lg:hidden p-4 border-b border-white/10">
                 <button
@@ -287,7 +426,22 @@ export default function ChatPage() {
               <ChatBox
                 key={currentSessionId || 'new-chat'}
                 sessionId={currentSessionId}
+                taskId={taskId || undefined}
                 onSessionCreated={handleSessionCreated}
+                onTaskComplete={async (taskIdToComplete) => {
+                  try {
+                    await completeTaskMutation.mutateAsync({ taskId: taskIdToComplete })
+                    // Invalidate queries to refresh UI in Tasks page and Stats
+                    await utils.task.getTasks.invalidate()
+                    await utils.task.getTaskProgress.invalidate({ taskId: taskIdToComplete })
+                    await utils.task.getTaskProgress.invalidate() // Also invalidate all task progress
+                    await utils.stats.getUserStats.invalidate()
+                    toast.success('Task marked as completed! 🎉')
+                  } catch (error) {
+                    console.error('Error completing task:', error)
+                    toast.error('Failed to complete task. Please try again.')
+                  }
+                }}
               />
             </div>
             </div>

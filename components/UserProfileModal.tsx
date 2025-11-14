@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface UserProfileModalProps {
   isOpen: boolean
   onClose: () => void
   onComplete: (data: ProfileData) => void
   isOptional?: boolean
+  initialData?: ProfileData // Add initial data for editing
 }
 
 export interface ProfileData {
@@ -43,25 +44,46 @@ const AI_EXPERIENCE_OPTIONS = [
 const PROGRAMMING_LANGUAGES = [
   { value: 'python', label: 'Python' },
   { value: 'javascript', label: 'JavaScript' },
-  { value: 'java', label: 'Java' },
   { value: 'typescript', label: 'TypeScript' },
+  { value: 'java', label: 'Java' },
   { value: 'cpp', label: 'C++' },
   { value: 'csharp', label: 'C#' },
   { value: 'rust', label: 'Rust' },
   { value: 'go', label: 'Go' },
+  { value: 'ruby', label: 'Ruby' },
+  { value: 'php', label: 'PHP' },
+  { value: 'swift', label: 'Swift' },
+  { value: 'kotlin', label: 'Kotlin' },
+  { value: 'dart', label: 'Dart' },
+  { value: 'scala', label: 'Scala' },
+  { value: 'r', label: 'R' },
   { value: 'sql', label: 'SQL' },
 ]
 
-export default function UserProfileModal({ isOpen, onClose, onComplete, isOptional = false }: UserProfileModalProps) {
+export default function UserProfileModal({ isOpen, onClose, onComplete, isOptional = false, initialData }: UserProfileModalProps) {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState<ProfileData>({
-    experience: '',
-    focusAreas: [],
-    confidence: 3,
-    aiExperience: '',
-    preferredLanguages: [],
-    primaryLanguage: undefined,
+    experience: initialData?.experience || '',
+    focusAreas: initialData?.focusAreas || [],
+    confidence: initialData?.confidence || 3,
+    aiExperience: initialData?.aiExperience || '',
+    preferredLanguages: initialData?.preferredLanguages || [],
+    primaryLanguage: initialData?.primaryLanguage,
   })
+  
+  // Update form data when initialData changes (for editing)
+  useEffect(() => {
+    if (initialData && isOpen) {
+      setFormData({
+        experience: initialData.experience || '',
+        focusAreas: initialData.focusAreas || [],
+        confidence: initialData.confidence || 3,
+        aiExperience: initialData.aiExperience || '',
+        preferredLanguages: initialData.preferredLanguages || [],
+        primaryLanguage: initialData.primaryLanguage,
+      })
+    }
+  }, [initialData, isOpen])
 
   if (!isOpen) return null
 

@@ -11,6 +11,7 @@ model User {
   id        String   @id @default(cuid())
   // Remove email for research compliance - use anonymous IDs only
   role      String   @default("user") // "user" or "admin"
+  isBlocked Boolean  @default(false) // Block user from accessing the system
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

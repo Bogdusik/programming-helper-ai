@@ -26,6 +26,14 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-snap-type: y proximity;
+  scroll-padding-top: 0; /* Не используем padding, чтобы секции были точно по центру */
+}
+
+/* Scroll snap for section-based scrolling */
+.snap-start {
+  scroll-snap-align: start;
+  scroll-margin-top: 0; /* Убираем margin, чтобы секции были точно по центру */
 }
 
 body {

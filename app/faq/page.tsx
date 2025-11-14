@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
 
@@ -251,7 +252,7 @@ export default function FAQPage() {
             </h1>
             <p className="text-white/70 text-lg max-w-2xl mx-auto">
               Find answers to common questions about Programming Helper AI. 
-              Can't find what you're looking for? <a href="/contact" className="text-blue-400 hover:text-blue-300 underline">Contact us</a>.
+              Can't find what you're looking for? <Link href="/contact" className="text-blue-400 hover:text-blue-300 underline transition-colors">Contact us</Link>.
             </p>
           </div>
 
@@ -340,12 +341,12 @@ export default function FAQPage() {
             <p className="text-white/70 mb-6">
               Can't find the answer you're looking for? Please get in touch with our friendly team.
             </p>
-            <a
+            <Link
               href="/contact"
               className="inline-block px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-blue-500/50"
             >
               Contact Us
-            </a>
+            </Link>
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { currentUser } from '@clerk/nextjs/server'
+import { TRPCError } from '@trpc/server'
 import { db } from './db'
 
 export async function getCurrentUser() {
@@ -17,8 +18,17 @@ export async function getCurrentUser() {
     dbUser = await db.user.create({
       data: {
         id: user.id, // This is already anonymous from Clerk
-        role: 'user'
+        role: 'user',
+        isBlocked: false
       }
+    })
+  }
+
+  // Check if user is blocked
+  if (dbUser.isBlocked) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'User account is blocked'
     })
   }
 

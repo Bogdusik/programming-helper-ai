@@ -1,5 +1,33 @@
-// Simple in-memory rate limiting
+// Optimized in-memory rate limiting with efficient cleanup
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+
+// Track cleanup interval to avoid memory leaks
+let cleanupInterval: NodeJS.Timeout | null = null
+
+// Optimized cleanup - only run if map has entries
+function scheduleCleanup() {
+  if (cleanupInterval) return // Already scheduled
+  
+  cleanupInterval = setInterval(() => {
+    const now = Date.now()
+    let cleaned = 0
+    const maxCleanup = 1000 // Limit cleanup per cycle to avoid blocking
+    
+    for (const [key, record] of rateLimitMap.entries()) {
+      if (now > record.resetTime) {
+        rateLimitMap.delete(key)
+        cleaned++
+        if (cleaned >= maxCleanup) break // Prevent blocking on large maps
+      }
+    }
+    
+    // Clear interval if map is empty
+    if (rateLimitMap.size === 0 && cleanupInterval) {
+      clearInterval(cleanupInterval)
+      cleanupInterval = null
+    }
+  }, 30000) // Clean up every 30 seconds (more frequent for better memory management)
+}
 
 export function rateLimit(
   identifier: string,
@@ -16,6 +44,12 @@ export function rateLimit(
       count: 1,
       resetTime: now + windowMs
     })
+    
+    // Schedule cleanup if needed
+    if (!cleanupInterval) {
+      scheduleCleanup()
+    }
+    
     return {
       success: true,
       remaining: maxRequests - 1,
@@ -42,12 +76,12 @@ export function rateLimit(
   }
 }
 
-// Clean up expired records periodically
-setInterval(() => {
-  const now = Date.now()
-  for (const [key, record] of rateLimitMap.entries()) {
-    if (now > record.resetTime) {
-      rateLimitMap.delete(key)
+// Cleanup on process exit
+if (typeof process !== 'undefined') {
+  process.on('exit', () => {
+    if (cleanupInterval) {
+      clearInterval(cleanupInterval)
     }
-  }
-}, 60000) // Clean up every minute
+    rateLimitMap.clear()
+  })
+}

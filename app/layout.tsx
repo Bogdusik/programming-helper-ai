@@ -39,6 +39,8 @@ export default function RootLayout({
       signUpUrl="/sign-up"
       afterSignInUrl="/chat"
       afterSignUpUrl="/chat"
+      signInFallbackRedirectUrl="/chat"
+      signUpFallbackRedirectUrl="/chat"
     >
       <html lang="en">
         <body
