@@ -32,13 +32,15 @@ export default function AdminPage() {
     retry: false
   })
   
+  // OPTIMIZATION: Add staleTime to cache dashboard stats and reduce refetches
   const { data: dashboardStats, isLoading: statsLoading, error: statsError, refetch: refetchStats } = trpc.admin.getDashboardStats.useQuery(undefined, {
     enabled: isSignedIn && isLoaded,
-    retry: false
+    retry: false,
+    staleTime: 30 * 1000, // Cache for 30 seconds
   })
   
   // Get users list
-  const { data: usersData, isLoading: usersLoading } = trpc.admin.getUsers.useQuery(
+  const { data: usersData, isLoading: usersLoading, refetch: refetchUsers } = trpc.admin.getUsers.useQuery(
     { page: usersPage, limit: 20, search: usersSearch || undefined },
     { enabled: showUsersModal && isSignedIn && isLoaded }
   )
@@ -57,9 +59,26 @@ export default function AdminPage() {
         refetchUserDetails()
       }
       if (showUsersModal) {
-        // Refetch users list
-        // The query will auto-refetch
+        // Refetch users list to update button states
+        refetchUsers()
       }
+    },
+  })
+
+  const deleteUserMutation = trpc.admin.deleteUser.useMutation({
+    onSuccess: () => {
+      toast.success('User deleted successfully')
+      if (showUsersModal) {
+        // Refetch users list
+        refetchUsers()
+      }
+      if (showUserDetailsModal) {
+        setShowUserDetailsModal(false)
+        setSelectedUserId(null)
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to delete user')
     },
   })
   
@@ -506,23 +525,37 @@ export default function AdminPage() {
                               Details
                             </button>
                             {user.role !== 'admin' && (
-                              <button
-                                onClick={() => {
-                                  if (confirm(`Are you sure you want to ${user.isBlocked ? 'unblock' : 'block'} this user?`)) {
-                                    toggleBlockMutation.mutate({
-                                      userId: user.id,
-                                      isBlocked: !user.isBlocked,
-                                    })
-                                  }
-                                }}
-                                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                                  user.isBlocked
-                                    ? 'bg-green-600 hover:bg-green-700 text-white'
-                                    : 'bg-red-600 hover:bg-red-700 text-white'
-                                }`}
-                              >
-                                {user.isBlocked ? 'Unblock' : 'Block'}
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Are you sure you want to ${user.isBlocked ? 'unblock' : 'block'} this user?`)) {
+                                      toggleBlockMutation.mutate({
+                                        userId: user.id,
+                                        isBlocked: !user.isBlocked,
+                                      })
+                                    }
+                                  }}
+                                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                                    user.isBlocked
+                                      ? 'bg-green-600 hover:bg-green-700 text-white'
+                                      : 'bg-red-600 hover:bg-red-700 text-white'
+                                  }`}
+                                >
+                                  {user.isBlocked ? 'Unblock' : 'Block'}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Are you sure you want to DELETE this user? This will permanently delete all their data (messages, sessions, stats, etc.) and they will need to go through the personalization process again when they log in. This action cannot be undone!`)) {
+                                      deleteUserMutation.mutate({
+                                        userId: user.id,
+                                      })
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-xs font-medium transition-colors"
+                                >
+                                  Delete
+                                </button>
+                              </>
                             )}
                           </div>
                         </div>
@@ -624,23 +657,37 @@ export default function AdminPage() {
                     </div>
                   </div>
                   {userDetails.role !== 'admin' && (
-                    <button
-                      onClick={() => {
-                        if (confirm(`Are you sure you want to ${userDetails.isBlocked ? 'unblock' : 'block'} this user?`)) {
-                          toggleBlockMutation.mutate({
-                            userId: userDetails.id,
-                            isBlocked: !userDetails.isBlocked,
-                          })
-                        }
-                      }}
-                      className={`mt-3 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                        userDetails.isBlocked
-                          ? 'bg-green-600 hover:bg-green-700 text-white'
-                          : 'bg-red-600 hover:bg-red-700 text-white'
-                      }`}
-                    >
-                      {userDetails.isBlocked ? 'Unblock User' : 'Block User'}
-                    </button>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() => {
+                          if (confirm(`Are you sure you want to ${userDetails.isBlocked ? 'unblock' : 'block'} this user?`)) {
+                            toggleBlockMutation.mutate({
+                              userId: userDetails.id,
+                              isBlocked: !userDetails.isBlocked,
+                            })
+                          }
+                        }}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          userDetails.isBlocked
+                            ? 'bg-green-600 hover:bg-green-700 text-white'
+                            : 'bg-red-600 hover:bg-red-700 text-white'
+                        }`}
+                      >
+                        {userDetails.isBlocked ? 'Unblock User' : 'Block User'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`⚠️ WARNING: Are you sure you want to DELETE this user?\n\nThis will permanently delete:\n- All messages\n- All chat sessions\n- All statistics\n- All assessments\n- All language progress\n- All task progress\n- User profile\n\nAfter deletion, when the user logs in through Clerk, they will need to go through the personalization process again.\n\nThis action CANNOT be undone!`)) {
+                            deleteUserMutation.mutate({
+                              userId: userDetails.id,
+                            })
+                          }
+                        }}
+                        className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm font-medium transition-colors"
+                      >
+                        Delete User
+                      </button>
+                    </div>
                   )}
                   {userDetails.role === 'admin' && (
                     <div className="mt-3 px-4 py-2 bg-gray-600/50 text-white/50 rounded-md text-sm font-medium text-center">

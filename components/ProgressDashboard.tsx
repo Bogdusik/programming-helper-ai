@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { trpc } from '../lib/trpc-client'
 import { checkPostAssessmentEligibility, getPostAssessmentMessage } from '../lib/assessment-utils'
@@ -27,26 +27,31 @@ export default function ProgressDashboard() {
     )
   }
 
-  const preAssessment = assessments?.find(a => a.type === 'pre')
-  const postAssessment = assessments?.find(a => a.type === 'post')
-  const improvement = postAssessment && preAssessment
-    ? ((postAssessment.score || 0) - (preAssessment.score || 0))
-    : null
+  // OPTIMIZATION: Memoize assessment calculations
+  const preAssessment = useMemo(() => 
+    assessments?.find(a => a.type === 'pre'),
+    [assessments]
+  )
   
-  // Debug: log eligibility status
-  if (eligibility) {
-    console.log('Post-Assessment Eligibility:', {
-      isEligible: eligibility.isEligible,
-      days: `${eligibility.daysSinceRegistration}/${eligibility.minDaysRequired}`,
-      questions: `${eligibility.questionsAsked}/${eligibility.minQuestionsRequired}`,
-      tasks: `${eligibility.tasksCompleted}/${eligibility.minTasksRequired}`,
-      hasPostAssessment: !!postAssessment
-    })
-  }
+  const postAssessment = useMemo(() => 
+    assessments?.find(a => a.type === 'post'),
+    [assessments]
+  )
+  
+  const improvement = useMemo(() => 
+    postAssessment && preAssessment
+      ? ((postAssessment.score || 0) - (preAssessment.score || 0))
+      : null,
+    [postAssessment, preAssessment]
+  )
 
-  const daysSinceRegistration = userProfile.createdAt
-    ? Math.floor((new Date().getTime() - new Date(userProfile.createdAt).getTime()) / (1000 * 60 * 60 * 24))
-    : 0
+  // OPTIMIZATION: Memoize days calculation
+  const daysSinceRegistration = useMemo(() => 
+    userProfile.createdAt
+      ? Math.floor((new Date().getTime() - new Date(userProfile.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+      : 0,
+    [userProfile.createdAt]
+  )
 
   const handleTakePostAssessment = async () => {
     try {

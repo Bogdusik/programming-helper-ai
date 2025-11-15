@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo } from 'react'
 import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import { trpc } from '../../lib/trpc-client'
 import toast from 'react-hot-toast'
 
@@ -110,14 +111,7 @@ export default function TasksPage() {
   }, [isLoaded, isSignedIn, router])
 
   if (!isLoaded || isLoading) {
-    return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto"></div>
-          <p className="mt-4 text-white/80">Loading...</p>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   if (!isSignedIn) {

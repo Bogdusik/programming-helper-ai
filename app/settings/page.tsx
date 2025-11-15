@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import UserProfileModal, { ProfileData } from '../../components/UserProfileModal'
 import { trpc } from '../../lib/trpc-client'
 import toast from 'react-hot-toast'
@@ -46,14 +47,7 @@ export default function SettingsPage() {
   }
 
   if (!isLoaded) {
-    return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto"></div>
-          <p className="mt-4 text-white/80">Loading...</p>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   if (!isSignedIn) {
@@ -65,8 +59,8 @@ export default function SettingsPage() {
       <Navbar />
       <MinimalBackground />
 
-      <div className="relative pt-20 pb-8 min-h-screen">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="relative min-h-screen flex items-center justify-center pt-20 pb-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-white mb-4">Account Settings</h1>
             <p className="text-white/70 text-lg">Manage your profile and preferences</p>

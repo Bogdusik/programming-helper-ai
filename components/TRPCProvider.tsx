@@ -1,32 +1,57 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { trpc } from '../lib/trpc-client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { httpBatchLink } from '@trpc/client'
 
 export default function TRPCProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
         retry: (failureCount, error: unknown) => {
-          // Don't retry on 401 (Unauthorized) or 403 (Forbidden) errors
-          if (error && typeof error === 'object') {
-            if ('data' in error) {
-              const errorData = error.data as { httpStatus?: number; code?: string }
-              if (errorData.httpStatus === 401 || errorData.httpStatus === 403 || errorData.code === 'UNAUTHORIZED' || errorData.code === 'FORBIDDEN') {
-                return false
-              }
-              if (errorData.httpStatus === 404) return false
-            }
-            // Check for TRPCError
-            if ('code' in error) {
-              const trpcError = error as { code?: string }
-              if (trpcError.code === 'UNAUTHORIZED' || trpcError.code === 'FORBIDDEN') {
-                return false
-              }
+          if (!error || typeof error !== 'object') {
+            return failureCount < 3
+          }
+
+          const handleBlockedUser = () => {
+            if (typeof window !== 'undefined' && !window.location.pathname.includes('/blocked')) {
+              setTimeout(() => router.push('/blocked'), 0)
             }
           }
+
+          const isAuthError = (code?: string, httpStatus?: number) => 
+            code === 'UNAUTHORIZED' || code === 'FORBIDDEN' || httpStatus === 401 || httpStatus === 403
+
+          const isBlockedError = (code?: string, message?: string) =>
+            code === 'FORBIDDEN' && message === 'User account is blocked'
+
+          // Check error.data
+          if ('data' in error) {
+            const errorData = error.data as { httpStatus?: number; code?: string; message?: string }
+            if (isAuthError(errorData.code, errorData.httpStatus)) {
+              if (isBlockedError(errorData.code, errorData.message)) {
+                handleBlockedUser()
+              }
+              return false
+            }
+            if (errorData.httpStatus === 404) return false
+          }
+
+          // Check error.code directly
+          if ('code' in error) {
+            const trpcError = error as { code?: string; message?: string }
+            if (isAuthError(trpcError.code)) {
+              if (isBlockedError(trpcError.code, trpcError.message)) {
+                handleBlockedUser()
+              }
+              return false
+            }
+          }
+
           return failureCount < 3
         },
         staleTime: 5 * 60 * 1000,
@@ -35,21 +60,23 @@ export default function TRPCProvider({ children }: { children: React.ReactNode }
       },
       mutations: {
         retry: (failureCount, error: unknown) => {
-          // Don't retry mutations on auth errors
-          if (error && typeof error === 'object') {
-            if ('data' in error) {
-              const errorData = error.data as { httpStatus?: number; code?: string }
-              if (errorData.httpStatus === 401 || errorData.httpStatus === 403 || errorData.code === 'UNAUTHORIZED' || errorData.code === 'FORBIDDEN') {
-                return false
-              }
-            }
-            if ('code' in error) {
-              const trpcError = error as { code?: string }
-              if (trpcError.code === 'UNAUTHORIZED' || trpcError.code === 'FORBIDDEN') {
-                return false
-              }
-            }
+          if (!error || typeof error !== 'object') {
+            return failureCount < 1
           }
+
+          const isAuthError = (code?: string, httpStatus?: number) => 
+            code === 'UNAUTHORIZED' || code === 'FORBIDDEN' || httpStatus === 401 || httpStatus === 403
+
+          if ('data' in error) {
+            const errorData = error.data as { httpStatus?: number; code?: string }
+            if (isAuthError(errorData.code, errorData.httpStatus)) return false
+          }
+
+          if ('code' in error) {
+            const trpcError = error as { code?: string }
+            if (isAuthError(trpcError.code)) return false
+          }
+
           return failureCount < 1
         },
       },

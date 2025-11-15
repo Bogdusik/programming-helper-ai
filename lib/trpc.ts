@@ -1288,6 +1288,73 @@ export const appRouter = router({
         return user
       }),
 
+    deleteUser: adminProcedure
+      .input(z.object({
+        userId: z.string(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        // Check if user exists
+        const targetUser = await db.user.findUnique({
+          where: { id: input.userId },
+          select: { role: true },
+        })
+
+        if (!targetUser) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'User not found',
+          })
+        }
+
+        // Prevent deleting admin users
+        if (targetUser.role === 'admin') {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Admin users cannot be deleted',
+          })
+        }
+
+        // Delete all user data in correct order to respect foreign key constraints
+        await db.message.deleteMany({
+          where: { userId: input.userId }
+        })
+
+        await db.chatSession.deleteMany({
+          where: { userId: input.userId }
+        })
+
+        await db.assessment.deleteMany({
+          where: { userId: input.userId }
+        })
+
+        await db.languageProgress.deleteMany({
+          where: { userId: input.userId }
+        })
+
+        await db.userTaskProgress.deleteMany({
+          where: { userId: input.userId }
+        })
+
+        await db.stats.deleteMany({
+          where: { userId: input.userId }
+        })
+
+        await db.userProfile.deleteMany({
+          where: { userId: input.userId }
+        })
+
+        // Finally delete the user
+        await db.user.delete({
+          where: { id: input.userId }
+        })
+
+        logger.info('User deleted', ctx.user.id, {
+          deletedUserId: input.userId,
+        })
+
+        return { success: true }
+      }),
+
     // ========== VISUALIZATION DATA ==========
     getActivityChart: adminProcedure
       .input(z.object({

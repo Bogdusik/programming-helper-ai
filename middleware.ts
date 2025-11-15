@@ -3,7 +3,16 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 const isProtectedRoute = createRouteMatcher([
   '/chat(.*)',
   '/stats(.*)',
-  '/admin(.*)'
+  '/admin(.*)',
+  '/settings(.*)',
+  '/tasks(.*)'
+])
+
+const isBlockedAllowedRoute = createRouteMatcher([
+  '/blocked(.*)',
+  '/contact(.*)',
+  '/privacy(.*)',
+  '/terms(.*)'
 ])
 
 const isPublicApiRoute = createRouteMatcher([
@@ -13,8 +22,17 @@ const isPublicApiRoute = createRouteMatcher([
 export default clerkMiddleware((auth, req) => {
   if (isPublicApiRoute(req)) return
   
+  // Allow blocked and contact pages without protection (they handle their own auth)
+  if (isBlockedAllowedRoute(req)) {
+    return
+  }
+  
   // Protect other routes
-  if (isProtectedRoute(req)) auth.protect()
+  // Note: Block status check is handled on client-side and in tRPC procedures
+  // because middleware runs in Edge Runtime which doesn't support Prisma
+  if (isProtectedRoute(req)) {
+    auth.protect()
+  }
 })
 
 export const config = {

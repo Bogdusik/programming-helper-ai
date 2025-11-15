@@ -11,6 +11,7 @@ import ViteStyleCard from '../components/ViteStyleCard'
 import ResearchConsent from '../components/ResearchConsent'
 import { trpc } from '../lib/trpc-client'
 import { hasGivenConsent, saveConsentToStorage } from '../lib/research-consent'
+import { formatTimeAgo } from '../lib/utils'
 
 export default function Home() {
   const { isSignedIn, isLoaded, user } = useUser()
@@ -28,12 +29,7 @@ export default function Home() {
 
   const getLastUpdateTime = useMemo(() => {
     if (!dataUpdatedAt) return ''
-    const now = new Date()
-    const diff = Math.floor((now.getTime() - dataUpdatedAt) / 1000)
-    
-    if (diff < 60) return 'Just now'
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-    return `${Math.floor(diff / 3600)}h ago`
+    return formatTimeAgo(dataUpdatedAt)
   }, [dataUpdatedAt])
 
   useEffect(() => {

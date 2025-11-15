@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs'
 import TRPCProvider from '../components/TRPCProvider'
+import BlockedCheck from '../components/BlockedCheck'
 import Footer from '../components/Footer'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { Toaster } from 'react-hot-toast'
@@ -48,12 +49,14 @@ export default function RootLayout({
         >
           <ErrorBoundary>
             <TRPCProvider>
-              <div className="min-h-screen flex flex-col">
-                <main className="flex-1">
-                  {children}
-                </main>
-                <Footer />
-              </div>
+              <BlockedCheck>
+                <div className="min-h-screen flex flex-col">
+                  <main className="flex-1">
+                    {children}
+                  </main>
+                  <Footer />
+                </div>
+              </BlockedCheck>
               <Toaster 
                 position="top-right"
                 toastOptions={{

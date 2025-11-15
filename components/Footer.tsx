@@ -1,57 +1,72 @@
 'use client';
 
-import React from 'react';
-import { useState, useEffect } from 'react';
-import { useUser } from '@clerk/nextjs';
-import Link from 'next/link';
-import Logo from './Logo';
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useUser } from '@clerk/nextjs'
+import Link from 'next/link'
+import Logo from './Logo'
+import { useBlockedStatus } from '../hooks/useBlockedStatus'
+
+const QUICK_LINKS = [
+  { name: 'Chat', href: '/chat' },
+  { name: 'Statistics', href: '/stats' },
+  { name: 'FAQ', href: '/faq' },
+] as const
+
+const GET_STARTED_LINKS = [
+  { name: 'Sign In', href: '/sign-in' },
+  { name: 'Sign Up', href: '/sign-up' },
+] as const
+
+const SUPPORT_LINKS = [
+  { name: 'Contact Us', href: '/contact' },
+  { name: 'Privacy Policy', href: '/privacy' },
+  { name: 'Terms of Service', href: '/terms' },
+] as const
+
+const SUPPORT_LINKS_PUBLIC = [
+  { name: 'Privacy Policy', href: '/privacy' },
+  { name: 'Terms of Service', href: '/terms' },
+] as const
+
+const FooterLink = ({ name, href }: { name: string; href: string }) => (
+  <li>
+    <Link 
+      href={href}
+      className="text-slate-400 hover:text-white transition-colors duration-200 text-sm group flex items-center"
+    >
+      <span className="w-1 h-1 bg-slate-500 rounded-full mr-2 group-hover:bg-white transition-colors"></span>
+      {name}
+    </Link>
+  </li>
+)
 
 const Footer: React.FC = () => {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
-  const [isVisible, setIsVisible] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const { isSignedIn, isLoaded } = useUser();
+  // OPTIMIZATION: Use cached value from shared cache (hook will use cache if available)
+  const { isBlocked } = useBlockedStatus();
 
   useEffect(() => {
     setIsMounted(true);
     setCurrentTime(new Date());
     
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, [])
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsVisible(entry.isIntersecting);
-      },
-      { threshold: 0.1 }
-    );
-
-    const footerElement = document.getElementById('footer');
-    if (footerElement) {
-      observer.observe(footerElement);
-    }
-
-    return () => {
-      clearInterval(timer);
-      observer.disconnect();
-    };
-  }, []);
-
-  const formatTime = (date: Date) => {
+  const formatTime = useCallback((date: Date) => {
     return date.toLocaleTimeString('en-US', {
       hour12: false,
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
-    });
-  };
+    })
+  }, [])
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = useMemo(() => new Date().getFullYear(), [])
 
-  if (!isMounted) {
-    return null;
-  }
+  if (!isMounted) return null
 
   return (
     <footer 
@@ -71,7 +86,7 @@ const Footer: React.FC = () => {
 
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className={`grid grid-cols-1 gap-8 ${isLoaded && isSignedIn ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+        <div className={`grid grid-cols-1 gap-8 ${isLoaded && isSignedIn && !isBlocked ? 'md:grid-cols-4' : isLoaded && !isSignedIn ? 'md:grid-cols-4' : 'md:grid-cols-1'}`}>
           <div className="md:col-span-2">
             <div className="mb-4">
               <Logo size="lg" showText={true} />
@@ -89,71 +104,45 @@ const Footer: React.FC = () => {
             </div>
           </div>
 
-          {isLoaded && isSignedIn ? (
-            <div>
-              <h4 className="text-white font-semibold mb-4">Quick Links</h4>
-              <ul className="space-y-3">
-                {[
-                  { name: 'Chat', href: '/chat' },
-                  { name: 'Statistics', href: '/stats' },
-                  { name: 'FAQ', href: '/faq' }
-                ].map((link) => (
-                  <li key={link.name}>
-                    <Link 
-                      href={link.href}
-                      className="text-slate-400 hover:text-white transition-colors duration-200 text-sm group flex items-center"
-                    >
-                      <span className="w-1 h-1 bg-slate-500 rounded-full mr-2 group-hover:bg-white transition-colors"></span>
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <div>
-              <h4 className="text-white font-semibold mb-4">Get Started</h4>
-              <ul className="space-y-3">
-                {[
-                  { name: 'Sign In', href: '/sign-in' },
-                  { name: 'Sign Up', href: '/sign-up' },
-                  { name: 'Learn More', href: '#' },
-                  { name: 'Features', href: '#' }
-                ].map((link) => (
-                  <li key={link.name}>
-                    <Link 
-                      href={link.href}
-                      className="text-slate-400 hover:text-white transition-colors duration-200 text-sm group flex items-center"
-                    >
-                      <span className="w-1 h-1 bg-slate-500 rounded-full mr-2 group-hover:bg-white transition-colors"></span>
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div>
-            <h4 className="text-white font-semibold mb-4">Support</h4>
-            <ul className="space-y-3">
-              {[
-                { name: 'Contact Us', href: '/contact' },
-                { name: 'Privacy Policy', href: '/privacy' },
-                { name: 'Terms of Service', href: '/terms' }
-              ].map((link) => (
-                <li key={link.name}>
-                  <Link 
-                    href={link.href}
-                    className="text-slate-400 hover:text-white transition-colors duration-200 text-sm group flex items-center"
-                  >
-                    <span className="w-1 h-1 bg-slate-500 rounded-full mr-2 group-hover:bg-white transition-colors"></span>
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {isLoaded && isSignedIn && !isBlocked ? (
+            <>
+              <div>
+                <h4 className="text-white font-semibold mb-4">Quick Links</h4>
+                <ul className="space-y-3">
+                  {QUICK_LINKS.map((link) => (
+                    <FooterLink key={link.name} name={link.name} href={link.href} />
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h4 className="text-white font-semibold mb-4">Support</h4>
+                <ul className="space-y-3">
+                  {SUPPORT_LINKS.map((link) => (
+                    <FooterLink key={link.name} name={link.name} href={link.href} />
+                  ))}
+                </ul>
+              </div>
+            </>
+          ) : isLoaded && !isSignedIn ? (
+            <>
+              <div>
+                <h4 className="text-white font-semibold mb-4">Get Started</h4>
+                <ul className="space-y-3">
+                  {GET_STARTED_LINKS.map((link) => (
+                    <FooterLink key={link.name} name={link.name} href={link.href} />
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h4 className="text-white font-semibold mb-4">Support</h4>
+                <ul className="space-y-3">
+                  {SUPPORT_LINKS_PUBLIC.map((link) => (
+                    <FooterLink key={link.name} name={link.name} href={link.href} />
+                  ))}
+                </ul>
+              </div>
+            </>
+          ) : null}
         </div>
 
         <div className="mt-8 pt-8 border-t border-slate-700/50">

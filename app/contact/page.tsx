@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
 import { trpc } from '../../lib/trpc-client'
+import { useBlockedStatus } from '../../hooks/useBlockedStatus'
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -14,6 +15,7 @@ export default function ContactPage() {
   })
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState<string>('')
+  const { isBlocked } = useBlockedStatus()
 
   const sendMessageMutation = trpc.contact.sendMessage.useMutation({
     onSuccess: () => {
@@ -56,7 +58,7 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
-      <Navbar />
+      {!isBlocked && <Navbar />}
       <MinimalBackground />
 
       <div className="relative pt-20 pb-16 min-h-screen flex items-center">

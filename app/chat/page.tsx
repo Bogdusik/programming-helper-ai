@@ -2,17 +2,23 @@
 
 import { useUser } from '@clerk/nextjs'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, lazy, Suspense } from 'react'
 import Navbar from '../../components/Navbar'
 import ChatBox from '../../components/ChatBox'
 import ChatSidebar from '../../components/ChatSidebar'
-import OnboardingTour from '../../components/OnboardingTour'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import LanguageSelector from '../../components/LanguageSelector'
-import AssessmentModal, { AssessmentQuestion } from '../../components/AssessmentModal'
-import UserProfileModal, { ProfileData } from '../../components/UserProfileModal'
 import { hasGivenConsent } from '../../lib/research-consent'
 import { trpc } from '../../lib/trpc-client'
 import toast from 'react-hot-toast'
+
+// OPTIMIZATION: Lazy load heavy modal components that are not always needed
+const OnboardingTour = lazy(() => import('../../components/OnboardingTour'))
+const AssessmentModal = lazy(() => import('../../components/AssessmentModal'))
+const UserProfileModal = lazy(() => import('../../components/UserProfileModal'))
+
+import type { AssessmentQuestion } from '../../components/AssessmentModal'
+import type { ProfileData } from '../../components/UserProfileModal'
 
 export default function ChatPage() {
   const { isSignedIn, isLoaded } = useUser()
@@ -27,16 +33,26 @@ export default function ChatPage() {
   const [assessmentQuestions, setAssessmentQuestions] = useState<AssessmentQuestion[]>([])
   const [taskInitialized, setTaskInitialized] = useState(false)
   
-  const { data: userProfile, refetch: refetchProfile } = trpc.profile.getProfile.useQuery(undefined, {
+  // OPTIMIZATION: Add staleTime to cache data and improve navigation speed
+  const { data: userProfile, refetch: refetchProfile, error: profileError } = trpc.profile.getProfile.useQuery(undefined, {
     enabled: isSignedIn,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    onError: (error) => {
+      // If user is blocked, redirect to blocked page
+      if (error.data?.code === 'FORBIDDEN' && error.message === 'User account is blocked') {
+        router.push('/blocked')
+      }
+    },
   })
   
   const { data: onboardingStatus } = trpc.onboarding.getOnboardingStatus.useQuery(undefined, {
     enabled: isSignedIn,
+    staleTime: 10 * 60 * 1000, // Cache for 10 minutes (rarely changes)
   })
   
   const { data: preAssessment, refetch: refetchAssessment } = trpc.assessment.getAssessments.useQuery(undefined, {
     enabled: isSignedIn,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   })
   
   const utils = trpc.useUtils()
@@ -149,6 +165,11 @@ export default function ChatPage() {
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       router.push('/')
+    }
+    
+    // Check if user is blocked (handled via tRPC error in onError callback)
+    if (profileError && profileError.data?.code === 'FORBIDDEN') {
+      router.push('/blocked')
     }
     
     // Check research consent
@@ -307,14 +328,7 @@ export default function ChatPage() {
   }
 
   if (!isLoaded) {
-    return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto"></div>
-          <p className="mt-4 text-white/80">Loading...</p>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   if (!isSignedIn) {
@@ -327,41 +341,47 @@ export default function ChatPage() {
       
       {/* User Profile Modal - Step 1 */}
       {showProfileModal && (
-        <UserProfileModal
-          isOpen={showProfileModal}
-          onClose={() => setShowProfileModal(false)}
-          onComplete={handleProfileComplete}
-          isOptional={userProfile?.profileCompleted || false}
-          initialData={userProfile ? {
-            experience: userProfile.selfReportedLevel || '',
-            focusAreas: userProfile.learningGoals || [],
-            confidence: userProfile.initialConfidence || 3,
-            aiExperience: userProfile.aiExperience || '',
-            preferredLanguages: userProfile.preferredLanguages || [],
-            primaryLanguage: userProfile.primaryLanguage,
-          } : undefined}
-        />
+        <Suspense fallback={null}>
+          <UserProfileModal
+            isOpen={showProfileModal}
+            onClose={() => setShowProfileModal(false)}
+            onComplete={handleProfileComplete}
+            isOptional={userProfile?.profileCompleted || false}
+            initialData={userProfile ? {
+              experience: userProfile.selfReportedLevel || '',
+              focusAreas: userProfile.learningGoals || [],
+              confidence: userProfile.initialConfidence || 3,
+              aiExperience: userProfile.aiExperience || '',
+              preferredLanguages: userProfile.preferredLanguages || [],
+              primaryLanguage: userProfile.primaryLanguage,
+            } : undefined}
+          />
+        </Suspense>
       )}
 
       {/* Pre-Assessment Modal - Step 2 */}
       {showPreAssessment && assessmentQuestions.length > 0 && (
-        <AssessmentModal
-          isOpen={showPreAssessment}
-          onClose={() => setShowPreAssessment(false)}
-          onSubmit={handleAssessmentSubmit}
-          type="pre"
-          questions={assessmentQuestions}
-          language={userProfile?.primaryLanguage}
-        />
+        <Suspense fallback={null}>
+          <AssessmentModal
+            isOpen={showPreAssessment}
+            onClose={() => setShowPreAssessment(false)}
+            onSubmit={handleAssessmentSubmit}
+            type="pre"
+            questions={assessmentQuestions}
+            language={userProfile?.primaryLanguage}
+          />
+        </Suspense>
       )}
 
       {/* Onboarding Tour - Step 3 */}
       {showOnboarding && !showProfileModal && !showPreAssessment && (
-        <OnboardingTour
-          isActive={showOnboarding}
-          onComplete={handleOnboardingComplete}
-          onSkip={handleOnboardingSkip}
-        />
+        <Suspense fallback={null}>
+          <OnboardingTour
+            isActive={showOnboarding}
+            onComplete={handleOnboardingComplete}
+            onSkip={handleOnboardingSkip}
+          />
+        </Suspense>
       )}
       
       <div className="pt-20 pb-8 min-h-[calc(100vh-5rem)] flex flex-col" style={{ minHeight: 'calc(100vh - 5rem)' }}>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { trpc } from '../lib/trpc-client'
 
@@ -109,7 +109,8 @@ export default function ChatSidebar({ currentSessionId, onSessionSelect, onNewCh
     setEditTitle('')
   }
 
-  const formatDate = (date: Date) => {
+  // OPTIMIZATION: Memoize formatDate to avoid recreating on every render
+  const formatDate = useCallback((date: Date) => {
     const now = new Date()
     const diffInHours = (now.getTime() - new Date(date).getTime()) / (1000 * 60 * 60)
     
@@ -120,7 +121,7 @@ export default function ChatSidebar({ currentSessionId, onSessionSelect, onNewCh
     } else {
       return new Date(date).toLocaleDateString([], { month: 'short', day: 'numeric' })
     }
-  }
+  }, [])
 
   return (
     <div className="w-80 bg-slate-900/50 border-r border-white/10 flex flex-col h-full min-h-0 relative z-10 flex-shrink-0">

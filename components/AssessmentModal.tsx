@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 
 interface AssessmentModalProps {
   isOpen: boolean
@@ -52,17 +52,21 @@ export default function AssessmentModal({
 
   if (!isOpen || questions.length === 0) return null
 
-  const question = questions[currentQuestion]
-  const progress = ((currentQuestion + 1) / questions.length) * 100
+  // OPTIMIZATION: Memoize current question and progress
+  const question = useMemo(() => questions[currentQuestion], [questions, currentQuestion])
+  const progress = useMemo(() => 
+    ((currentQuestion + 1) / questions.length) * 100,
+    [currentQuestion, questions.length]
+  )
 
-  const handleAnswer = (answer: string) => {
+  const handleAnswer = useCallback((answer: string) => {
     setAnswers(prev => ({
       ...prev,
       [question.id]: answer
     }))
-  }
+  }, [question.id])
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1)
     } else {
@@ -74,16 +78,23 @@ export default function AssessmentModal({
       }))
       onSubmit(assessmentAnswers, confidence)
     }
-  }
+  }, [currentQuestion, questions.length, questions, answers, confidence, onSubmit])
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     if (currentQuestion > 0) {
       setCurrentQuestion(currentQuestion - 1)
     }
-  }
+  }, [currentQuestion])
 
-  const isAnswered = answers[question.id] !== undefined
-  const canProceed = isAnswered || question.type === 'conceptual'
+  // OPTIMIZATION: Memoize computed values
+  const isAnswered = useMemo(() => 
+    answers[question.id] !== undefined,
+    [answers, question.id]
+  )
+  const canProceed = useMemo(() => 
+    isAnswered || question.type === 'conceptual',
+    [isAnswered, question.type]
+  )
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

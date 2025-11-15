@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import ProgressDashboard from '../../components/ProgressDashboard'
 import AssessmentModal, { AssessmentQuestion } from '../../components/AssessmentModal'
 import { trpc } from '../../lib/trpc-client'
@@ -15,14 +16,14 @@ export default function StatsPage() {
   const [showPostAssessment, setShowPostAssessment] = useState(false)
   const [assessmentQuestions, setAssessmentQuestions] = useState<AssessmentQuestion[]>([])
   
-  const { data: stats, isLoading: statsLoading, error: statsError } = trpc.stats.getUserStats.useQuery()
+  // OPTIMIZATION: Add staleTime to cache data and improve navigation speed
+  const { data: stats, isLoading: statsLoading, error: statsError } = trpc.stats.getUserStats.useQuery(undefined, {
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
+  })
   const { data: userProfile } = trpc.profile.getProfile.useQuery(undefined, {
     enabled: isSignedIn,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   })
-  const { data: eligibility } = trpc.assessment.checkPostAssessmentEligibility.useQuery(undefined, {
-    enabled: isSignedIn,
-  })
-  
   const getQuestionsMutation = trpc.assessment.getQuestions.useMutation()
   const submitAssessmentMutation = trpc.assessment.submitAssessment.useMutation()
 
@@ -33,14 +34,7 @@ export default function StatsPage() {
   }, [isLoaded, isSignedIn, router])
 
   if (!isLoaded || statsLoading) {
-    return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto"></div>
-          <p className="mt-4 text-white/80">Loading...</p>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   if (!isSignedIn) {
@@ -53,7 +47,18 @@ export default function StatsPage() {
         type: 'post',
         language: userProfile?.primaryLanguage || undefined,
       })
-      setAssessmentQuestions(questions as AssessmentQuestion[])
+      // Transform database questions to AssessmentQuestion format
+      const transformedQuestions: AssessmentQuestion[] = questions.map((q: any) => ({
+        id: q.id,
+        question: q.question,
+        type: q.type as 'multiple_choice' | 'code_snippet' | 'conceptual',
+        options: Array.isArray(q.options) ? q.options : (q.options ? [q.options] : undefined),
+        correctAnswer: q.correctAnswer,
+        category: q.category,
+        difficulty: q.difficulty,
+        explanation: q.explanation || undefined,
+      }))
+      setAssessmentQuestions(transformedQuestions)
       setShowPostAssessment(true)
     } catch (error) {
       console.error('Error loading assessment questions:', error)
@@ -120,11 +125,11 @@ export default function StatsPage() {
           onSubmit={handleAssessmentSubmit}
           type="post"
           questions={assessmentQuestions}
-          language={userProfile?.primaryLanguage}
+          language={userProfile?.primaryLanguage || undefined}
         />
       )}
 
-      <div className="relative pt-20 pb-8 min-h-screen">
+      <div className="relative pt-30 pb-40 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="text-center mb-6">
             <h1 className="text-3xl font-bold text-white mb-2">Your Programming Journey</h1>

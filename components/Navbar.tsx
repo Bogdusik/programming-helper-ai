@@ -6,29 +6,35 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import Logo from './Logo'
 import { trpc } from '@/lib/trpc-client'
+import { useBlockedStatus } from '../hooks/useBlockedStatus'
+
+const NAV_LINKS = [
+  { name: 'Chat', href: '/chat' },
+  { name: 'Stats', href: '/stats', dataTour: 'stats-link' },
+  { name: 'Tasks', href: '/tasks' },
+] as const
 
 export default function Navbar() {
   const { isSignedIn, user } = useUser()
   const pathname = usePathname()
   const [isScrolled, setIsScrolled] = useState(false)
+  const { isBlocked } = useBlockedStatus({ skipPaths: ['/blocked', '/contact'] })
   
-  // Check if user is admin by checking their role in the database
   const { data: userRole } = trpc.auth.getMyRole.useQuery(undefined, {
     enabled: isSignedIn,
     retry: false,
     refetchOnWindowFocus: false
   })
   
-  // Also check Clerk publicMetadata as fallback
   const isAdmin = user?.publicMetadata?.role === 'admin' || userRole?.role === 'admin'
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20)
-    }
+    const handleScroll = () => setIsScrolled(window.scrollY > 20)
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  if (pathname === '/blocked') return null
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -45,56 +51,42 @@ export default function Navbar() {
           </div>
           
           <div className="flex items-center space-x-4">
-            {isSignedIn && (
+            {isSignedIn && !isBlocked && (
               <>
-                <Link 
-                  href="/chat" 
-                  className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg ${
-                    pathname === '/chat' 
-                      ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-500/25' 
-                      : 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white hover:shadow-slate-500/25'
-                  }`}
-                >
-                  Chat
-                </Link>
-                <Link 
-                  href="/stats" 
-                  data-tour="stats-link"
-                  className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg ${
-                    pathname === '/stats' 
-                      ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-500/25' 
-                      : 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white hover:shadow-slate-500/25'
-                  }`}
-                >
-                  Stats
-                </Link>
-                <Link 
-                  href="/tasks" 
-                  className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg ${
-                    pathname === '/tasks' 
-                      ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-500/25' 
-                      : 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white hover:shadow-slate-500/25'
-                  }`}
-                >
-                  Tasks
-                </Link>
-                {isAdmin && (
-                  <Link 
-                    href="/admin" 
+                {NAV_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    prefetch={true}
+                    {...(link.dataTour ? { 'data-tour': link.dataTour } : {})}
                     className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg ${
-                      pathname === '/admin' 
-                        ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-500/25' 
+                      pathname === link.href
+                        ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-500/25'
+                        : 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white hover:shadow-slate-500/25'
+                    }`}
+                  >
+                    {link.name}
+                  </Link>
+                ))}
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    prefetch={true}
+                    className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg ${
+                      pathname === '/admin'
+                        ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-500/25'
                         : 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white hover:shadow-slate-500/25'
                     }`}
                   >
                     Admin
                   </Link>
                 )}
-                <Link 
-                  href="/settings" 
+                <Link
+                  href="/settings"
+                  prefetch={true}
                   className={`p-2 rounded-full transition-all duration-200 hover:shadow-lg ${
-                    pathname === '/settings' 
-                      ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-500/25' 
+                    pathname === '/settings'
+                      ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-500/25'
                       : 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white hover:shadow-slate-500/25'
                   }`}
                   title="Settings"

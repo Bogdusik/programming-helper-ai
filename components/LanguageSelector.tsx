@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 
 interface LanguageSelectorProps {
   selectedLanguages: string[]
@@ -73,10 +73,13 @@ export default function LanguageSelector({
     }
   }, [isOpen])
 
-  // Filter languages based on search query
-  const filteredLanguages = PROGRAMMING_LANGUAGES.filter(lang =>
-    lang.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    lang.value.toLowerCase().includes(searchQuery.toLowerCase())
+  // OPTIMIZATION: Memoize filtered languages to avoid recalculation on every render
+  const filteredLanguages = useMemo(() => 
+    PROGRAMMING_LANGUAGES.filter(lang =>
+      lang.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      lang.value.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+    [searchQuery]
   )
 
   const toggleLanguage = (lang: string) => {
