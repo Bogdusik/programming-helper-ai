@@ -15,6 +15,10 @@ const t = initTRPC.create()
 export const router = t.router
 export const publicProcedure = t.procedure
 
+/**
+ * Protected procedure that requires authentication
+ * Ensures user is authenticated before proceeding
+ */
 const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
   const user = await getCurrentUser()
   if (!user) {
@@ -28,6 +32,11 @@ const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
   })
 })
 
+/**
+ * Admin procedure that requires admin role
+ * Must be used after protectedProcedure to ensure user is authenticated
+ * @throws TRPCError with FORBIDDEN code if user is not admin
+ */
 const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   const { user } = ctx
   if (user.role !== 'admin') {
@@ -1664,15 +1673,39 @@ export const appRouter = router({
         level: z.enum(['error', 'warn', 'info']).optional(),
       }))
       .query(async ({ input }) => {
-        // In a real implementation, you'd query from a logging service
-        // For now, return empty array - can be extended with actual logging
+        // Get logs from logger (stored in memory)
+        const allLogs = logger.getLogs()
+        
+        // Filter by level if specified
+        let filteredLogs = allLogs
+        if (input.level) {
+          filteredLogs = allLogs.filter(log => log.level === input.level)
+        }
+        
+        // Sort by timestamp (newest first)
+        filteredLogs.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+        
+        // Paginate
+        const startIndex = (input.page - 1) * input.limit
+        const endIndex = startIndex + input.limit
+        const paginatedLogs = filteredLogs.slice(startIndex, endIndex)
+        
+        // Format logs for display
+        const formattedLogs = paginatedLogs.map(log => ({
+          level: log.level,
+          message: log.message,
+          timestamp: log.timestamp.toISOString(),
+          userId: log.userId,
+          metadata: log.metadata,
+        }))
+        
         return {
-          logs: [],
+          logs: formattedLogs,
           pagination: {
             page: input.page,
             limit: input.limit,
-            total: 0,
-            totalPages: 0,
+            total: filteredLogs.length,
+            totalPages: Math.ceil(filteredLogs.length / input.limit),
           },
         }
       }),
@@ -1683,16 +1716,42 @@ export const appRouter = router({
         limit: z.number().min(1).max(100).default(20),
       }))
       .query(async ({ input }) => {
-        // Get recent admin actions from analytics
-        // This would require an admin_actions table or similar
-        // For now, return empty - can be extended
+        // Get logs from logger and filter for admin actions
+        // Admin actions are logged with info level and contain admin-related messages
+        const allLogs = logger.getLogs()
+        
+        // Filter for admin-related activities (block/unblock, delete user, etc.)
+        const adminActivityKeywords = ['blocked', 'unblocked', 'deleted', 'created', 'updated', 'admin']
+        const adminActivities = allLogs.filter(log => 
+          log.level === 'info' && 
+          adminActivityKeywords.some(keyword => 
+            log.message.toLowerCase().includes(keyword.toLowerCase())
+          )
+        )
+        
+        // Sort by timestamp (newest first)
+        adminActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+        
+        // Paginate
+        const startIndex = (input.page - 1) * input.limit
+        const endIndex = startIndex + input.limit
+        const paginatedActivities = adminActivities.slice(startIndex, endIndex)
+        
+        // Format activities for display
+        const formattedActivities = paginatedActivities.map(activity => ({
+          action: activity.message,
+          timestamp: activity.timestamp.toISOString(),
+          adminUserId: activity.userId,
+          metadata: activity.metadata,
+        }))
+        
         return {
-          activities: [],
+          activities: formattedActivities,
           pagination: {
             page: input.page,
             limit: input.limit,
-            total: 0,
-            totalPages: 0,
+            total: adminActivities.length,
+            totalPages: Math.ceil(adminActivities.length / input.limit),
           },
         }
       }),
@@ -2613,7 +2672,9 @@ export const appRouter = router({
             message: input.message,
           })
         } catch (error) {
-          console.error('Error sending email notification:', error)
+          logger.error('Error sending email notification', undefined, {
+            error: error instanceof Error ? error.message : 'Unknown error'
+          })
           // Don't fail the mutation if email fails - message is still saved
         }
 

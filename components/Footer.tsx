@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useUser } from '@clerk/nextjs'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Logo from './Logo'
 import { useBlockedStatus } from '../hooks/useBlockedStatus'
@@ -44,8 +45,33 @@ const Footer: React.FC = () => {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const { isSignedIn, isLoaded } = useUser();
-  // OPTIMIZATION: Use cached value from shared cache (hook will use cache if available)
-  const { isBlocked } = useBlockedStatus();
+  const pathname = usePathname();
+  
+  // Check block status - don't skip /contact, we need to know if user is blocked even on contact page
+  const { isBlocked, isLoading: isCheckingBlocked } = useBlockedStatus({
+    skipPaths: [], // Don't skip /contact - we need to check block status here
+    enabled: isSignedIn && isLoaded,
+  });
+  
+  // Check if user is on blocked page
+  const isOnBlockedPage = pathname === '/blocked';
+  // Hide links if user is blocked (regardless of page) OR on blocked page
+  // For blocked users, we hide all footer links on all pages
+  const shouldHideQuickLinks = isBlocked || isOnBlockedPage;
+  
+  // CRITICAL: For blocked users, never show Quick Links or Support links
+  // Show links only for non-blocked signed-in users
+  const shouldShowQuickLinks = useMemo(() => {
+    if (!isLoaded) return false;
+    if (!isSignedIn) return false;
+    // CRITICAL: If user is blocked, never show links (even during check)
+    if (isBlocked) return false;
+    // If we're checking and user is not blocked, show links optimistically
+    // This prevents flickering during the check for non-blocked users
+    if (isCheckingBlocked) return true;
+    // Show links if user is not blocked
+    return !shouldHideQuickLinks;
+  }, [isLoaded, isSignedIn, isCheckingBlocked, shouldHideQuickLinks, isBlocked]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -86,8 +112,12 @@ const Footer: React.FC = () => {
 
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className={`grid grid-cols-1 gap-8 ${isLoaded && isSignedIn && !isBlocked ? 'md:grid-cols-4' : isLoaded && !isSignedIn ? 'md:grid-cols-4' : 'md:grid-cols-1'}`}>
-          <div className="md:col-span-2">
+        <div className={`grid grid-cols-1 gap-8 ${
+          shouldShowQuickLinks || (isLoaded && !isSignedIn)
+            ? 'md:grid-cols-4' 
+            : 'md:grid-cols-1'
+        }`}>
+          <div className={shouldShowQuickLinks || (isLoaded && !isSignedIn) ? 'md:col-span-2' : 'md:col-span-1'}>
             <div className="mb-4">
               <Logo size="lg" showText={true} />
             </div>
@@ -104,7 +134,9 @@ const Footer: React.FC = () => {
             </div>
           </div>
 
-          {isLoaded && isSignedIn && !isBlocked ? (
+          {/* Show Quick Links and Support only for non-blocked signed-in users */}
+          {/* Use stabilized state to prevent flickering */}
+          {shouldShowQuickLinks ? (
             <>
               <div>
                 <h4 className="text-white font-semibold mb-4">Quick Links</h4>
@@ -123,9 +155,12 @@ const Footer: React.FC = () => {
                 </ul>
               </div>
             </>
-          ) : isLoaded && !isSignedIn ? (
+          ) : null}
+
+          {/* Show Get Started and Support for non-signed-in users - they should be side by side */}
+          {isLoaded && !isSignedIn ? (
             <>
-              <div>
+              <div className="md:col-span-1">
                 <h4 className="text-white font-semibold mb-4">Get Started</h4>
                 <ul className="space-y-3">
                   {GET_STARTED_LINKS.map((link) => (
@@ -133,7 +168,7 @@ const Footer: React.FC = () => {
                   ))}
                 </ul>
               </div>
-              <div>
+              <div className="md:col-span-1">
                 <h4 className="text-white font-semibold mb-4">Support</h4>
                 <ul className="space-y-3">
                   {SUPPORT_LINKS_PUBLIC.map((link) => (

@@ -2,6 +2,12 @@ import { currentUser } from '@clerk/nextjs/server'
 import { TRPCError } from '@trpc/server'
 import { db } from './db'
 
+/**
+ * Get current authenticated user from Clerk and database
+ * Creates user in database if doesn't exist
+ * @returns User object from database or null if not authenticated
+ * @throws TRPCError with FORBIDDEN code if user is blocked
+ */
 export async function getCurrentUser() {
   const user = await currentUser()
   
@@ -35,6 +41,10 @@ export async function getCurrentUser() {
   return dbUser
 }
 
+/**
+ * Check if current user has admin role
+ * @returns true if user is admin, false otherwise
+ */
 export async function isAdmin() {
   const user = await getCurrentUser()
   return user?.role === 'admin'

@@ -20,8 +20,13 @@ if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = db
 }
 
-// Graceful shutdown
-if (typeof process !== 'undefined') {
+// Graceful shutdown - only register once to avoid memory leaks in hot reload
+const globalForShutdown = globalThis as unknown as {
+  dbShutdownRegistered?: boolean
+}
+
+if (typeof process !== 'undefined' && !globalForShutdown.dbShutdownRegistered) {
+  globalForShutdown.dbShutdownRegistered = true
   process.on('beforeExit', async () => {
     await db.$disconnect()
   })

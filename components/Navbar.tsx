@@ -18,7 +18,13 @@ export default function Navbar() {
   const { isSignedIn, user } = useUser()
   const pathname = usePathname()
   const [isScrolled, setIsScrolled] = useState(false)
-  const { isBlocked } = useBlockedStatus({ skipPaths: ['/blocked', '/contact'] })
+  // OPTIMIZATION: Use cached block status from BlockedCheck instead of making separate request
+  // BlockedCheck already handles the check, we just need to know the result
+  // This reduces API calls - Navbar will get status from cache or shared request
+  const { isBlocked } = useBlockedStatus({ 
+    skipPaths: [], // Don't skip /contact - we need to check block status here
+    enabled: isSignedIn,
+  })
   
   const { data: userRole } = trpc.auth.getMyRole.useQuery(undefined, {
     enabled: isSignedIn,
@@ -35,6 +41,9 @@ export default function Navbar() {
   }, [])
 
   if (pathname === '/blocked') return null
+  
+  // Don't render Navbar for blocked users (they should only see contact form)
+  if (isBlocked) return null
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${

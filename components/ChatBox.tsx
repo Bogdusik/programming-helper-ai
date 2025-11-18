@@ -5,6 +5,10 @@ import toast from 'react-hot-toast'
 import Message from './Message'
 import { trpc } from '../lib/trpc-client'
 
+// Scroll animation constants
+const SCROLL_ANIMATION_DURATION_MS = 300 // Animation duration in milliseconds
+const SCROLL_BOTTOM_THRESHOLD_PX = 10 // Threshold in pixels to consider at bottom
+
 interface ChatBoxProps {
   sessionId?: string
   taskId?: string
@@ -114,13 +118,12 @@ export default function ChatBox({ sessionId, taskId, onSessionCreated, onTaskCom
       // Smooth scroll animation
       const startScrollTop = container.scrollTop
       const distance = targetScrollTop - startScrollTop
-      const duration = 300 // 300ms animation
       let startTime: number | null = null
 
       const animateScroll = (currentTime: number) => {
         if (startTime === null) startTime = currentTime
         const elapsed = currentTime - startTime
-        const progress = Math.min(elapsed / duration, 1)
+        const progress = Math.min(elapsed / SCROLL_ANIMATION_DURATION_MS, 1)
         
         // Easing function for smooth animation
         const easeOutCubic = 1 - Math.pow(1 - progress, 3)
@@ -139,7 +142,7 @@ export default function ChatBox({ sessionId, taskId, onSessionCreated, onTaskCom
   const handleScroll = useCallback(() => {
     if (messagesContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current
-      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10 // 10px threshold
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - SCROLL_BOTTOM_THRESHOLD_PX
       setIsUserAtBottom(isAtBottom)
     }
   }, [])

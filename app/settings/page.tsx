@@ -8,11 +8,16 @@ import MinimalBackground from '../../components/MinimalBackground'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import UserProfileModal, { ProfileData } from '../../components/UserProfileModal'
 import { trpc } from '../../lib/trpc-client'
+import { useBlockedStatus } from '../../hooks/useBlockedStatus'
 import toast from 'react-hot-toast'
 
 export default function SettingsPage() {
   const { isSignedIn, isLoaded } = useUser()
   const router = useRouter()
+  const { isBlocked, isLoading: isCheckingBlocked } = useBlockedStatus({
+    skipPaths: ['/blocked', '/contact'],
+    enabled: isSignedIn && isLoaded,
+  })
   const [showProfileModal, setShowProfileModal] = useState(false)
   
   const { data: userProfile, refetch: refetchProfile } = trpc.profile.getProfile.useQuery(undefined, {
@@ -24,8 +29,14 @@ export default function SettingsPage() {
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       router.push('/')
+      return
     }
-  }, [isLoaded, isSignedIn, router])
+    
+    // Redirect blocked users to blocked page
+    if (isLoaded && isSignedIn && isBlocked) {
+      router.replace('/blocked')
+    }
+  }, [isLoaded, isSignedIn, isBlocked, router])
 
   const handleProfileComplete = async (data: ProfileData) => {
     try {
@@ -46,7 +57,7 @@ export default function SettingsPage() {
     }
   }
 
-  if (!isLoaded) {
+  if (!isLoaded || (isSignedIn && isCheckingBlocked) || (isSignedIn && isBlocked)) {
     return <LoadingSpinner />
   }
 

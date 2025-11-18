@@ -1,10 +1,33 @@
 'use client'
 
 import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useUser } from '@clerk/nextjs'
 import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
+import { useBlockedStatus } from '../../hooks/useBlockedStatus'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function TermsPage() {
+  const { isSignedIn, isLoaded } = useUser()
+  const router = useRouter()
+  const { isBlocked, isLoading } = useBlockedStatus({
+    skipPaths: ['/blocked', '/contact'],
+    enabled: isSignedIn && isLoaded,
+  })
+
+  // Redirect blocked users to blocked page
+  useEffect(() => {
+    if (isLoaded && isSignedIn && isBlocked) {
+      router.replace('/blocked')
+    }
+  }, [isLoaded, isSignedIn, isBlocked, router])
+
+  // Show loading while checking or redirecting
+  if (!isLoaded || (isSignedIn && isLoading) || (isSignedIn && isBlocked)) {
+    return <LoadingSpinner />
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
       <Navbar />

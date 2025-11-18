@@ -10,6 +10,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import LanguageSelector from '../../components/LanguageSelector'
 import { hasGivenConsent } from '../../lib/research-consent'
 import { trpc } from '../../lib/trpc-client'
+import { useBlockedStatus } from '../../hooks/useBlockedStatus'
 import toast from 'react-hot-toast'
 
 // OPTIMIZATION: Lazy load heavy modal components that are not always needed
@@ -32,6 +33,12 @@ export default function ChatPage() {
   const [showPreAssessment, setShowPreAssessment] = useState(false)
   const [assessmentQuestions, setAssessmentQuestions] = useState<AssessmentQuestion[]>([])
   const [taskInitialized, setTaskInitialized] = useState(false)
+  
+  // Check if user is blocked - this should redirect via BlockedCheck, but adding extra safety
+  const { isBlocked, isLoading: isCheckingBlocked } = useBlockedStatus({
+    skipPaths: ['/blocked', '/contact'],
+    enabled: isSignedIn && isLoaded,
+  })
   
   // OPTIMIZATION: Add staleTime to cache data and improve navigation speed
   const { data: userProfile, refetch: refetchProfile, error: profileError } = trpc.profile.getProfile.useQuery(undefined, {
@@ -165,16 +172,25 @@ export default function ChatPage() {
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       router.push('/')
+      return
+    }
+    
+    // Check if user is blocked - redirect immediately
+    if (isBlocked) {
+      router.replace('/blocked')
+      return
     }
     
     // Check if user is blocked (handled via tRPC error in onError callback)
     if (profileError && profileError.data?.code === 'FORBIDDEN') {
       router.push('/blocked')
+      return
     }
     
     // Check research consent
     if (isLoaded && isSignedIn && !hasGivenConsent()) {
       router.push('/')
+      return
     }
     
     // Order: Profile → Pre-Assessment → Onboarding Tour
@@ -328,6 +344,16 @@ export default function ChatPage() {
   }
 
   if (!isLoaded) {
+    return <LoadingSpinner />
+  }
+
+  // Show loading while checking block status
+  if (isCheckingBlocked) {
+    return <LoadingSpinner />
+  }
+
+  // Don't render chat if user is blocked (should redirect, but safety check)
+  if (isBlocked) {
     return <LoadingSpinner />
   }
 

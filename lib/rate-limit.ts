@@ -76,8 +76,13 @@ export function rateLimit(
   }
 }
 
-// Cleanup on process exit
-if (typeof process !== 'undefined') {
+// Cleanup on process exit - only register once to avoid memory leaks in hot reload
+const globalForShutdown = globalThis as unknown as {
+  rateLimitShutdownRegistered?: boolean
+}
+
+if (typeof process !== 'undefined' && !globalForShutdown.rateLimitShutdownRegistered) {
+  globalForShutdown.rateLimitShutdownRegistered = true
   process.on('exit', () => {
     if (cleanupInterval) {
       clearInterval(cleanupInterval)

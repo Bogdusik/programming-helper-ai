@@ -3,7 +3,14 @@ import { getSystemPrompt } from './prompts'
 import { isProgrammingRelated, getRejectionMessage } from './programming-validator'
 import { logger } from './logger'
 
+// OpenAI API Configuration Constants
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
+const OPENAI_TIMEOUT_MS = 30000 // 30 seconds timeout
+const OPENAI_MAX_TOKENS_RESPONSE = 1000 // Max tokens for chat responses
+const OPENAI_MAX_TOKENS_ANALYSIS = 20 // Max tokens for analysis (title, question type)
+const OPENAI_TEMPERATURE_RESPONSE = 0.7 // Temperature for chat responses
+const OPENAI_TEMPERATURE_ANALYSIS = 0.3 // Temperature for analysis tasks
+const CONVERSATION_HISTORY_LIMIT = 20 // Maximum number of messages in history
 
 if (!OPENAI_API_KEY) {
   logger.error('OPENAI_API_KEY is not set', undefined, {
@@ -11,18 +18,30 @@ if (!OPENAI_API_KEY) {
   })
 }
 
-// Initialize OpenAI client only if API key is available
-// Use a getter function to ensure proper error handling
+/**
+ * Initialize OpenAI client only if API key is available
+ * Use a getter function to ensure proper error handling
+ * @returns OpenAI client instance
+ * @throws Error if API key is not configured
+ */
 function getOpenAIClient(): OpenAI {
   if (!OPENAI_API_KEY) {
     throw new Error('OpenAI API key is not configured')
   }
   return new OpenAI({
     apiKey: OPENAI_API_KEY,
-    timeout: 30000, // 30 seconds timeout
+    timeout: OPENAI_TIMEOUT_MS,
   })
 }
 
+/**
+ * Generate AI response for a programming question
+ * @param message - User's message/question
+ * @param conversationHistory - Previous messages in the conversation (optional)
+ * @param taskContext - Context about the current programming task (optional)
+ * @returns AI-generated response string
+ * @throws Error if OpenAI API key is not configured
+ */
 export async function generateResponse(
   message: string,
   conversationHistory?: Array<{ role: 'user' | 'assistant', content: string }>,
@@ -86,10 +105,10 @@ The goal is LEARNING, not just completing the task. Help them understand the con
       }
     ]
     
-    // Add conversation history (limit to last 20 messages to avoid token limits)
+    // Add conversation history (limit to avoid token limits)
     if (conversationHistory && conversationHistory.length > 0) {
-      // Take last 20 messages to stay within token limits
-      const recentHistory = conversationHistory.slice(-20)
+      // Take last N messages to stay within token limits
+      const recentHistory = conversationHistory.slice(-CONVERSATION_HISTORY_LIMIT)
       
       recentHistory.forEach(msg => {
         messages.push({
@@ -108,8 +127,8 @@ The goal is LEARNING, not just completing the task. Help them understand the con
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages,
-      max_tokens: 1000,
-      temperature: 0.7,
+      max_tokens: OPENAI_MAX_TOKENS_RESPONSE,
+      temperature: OPENAI_TEMPERATURE_RESPONSE,
     })
 
     return completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response."
@@ -121,6 +140,11 @@ The goal is LEARNING, not just completing the task. Help them understand the con
   }
 }
 
+/**
+ * Analyze and categorize a programming question
+ * @param message - The user's question to analyze
+ * @returns Category name (e.g., 'Code Debugging', 'Algorithm Help', etc.)
+ */
 export async function analyzeQuestionType(message: string): Promise<string> {
   if (!OPENAI_API_KEY) {
     return 'General Programming'
@@ -140,8 +164,8 @@ export async function analyzeQuestionType(message: string): Promise<string> {
           content: `Categorize this programming question: "${message}"`
         }
       ],
-      max_tokens: 20,
-      temperature: 0.3,
+      max_tokens: OPENAI_MAX_TOKENS_ANALYSIS,
+      temperature: OPENAI_TEMPERATURE_ANALYSIS,
     })
 
     const category = completion.choices[0]?.message?.content?.trim() || 'General Programming'
@@ -154,6 +178,11 @@ export async function analyzeQuestionType(message: string): Promise<string> {
   }
 }
 
+/**
+ * Generate a concise title for a chat conversation
+ * @param message - The first message in the conversation
+ * @returns Generated title (max 50 characters, fallback to truncated message)
+ */
 export async function generateChatTitle(message: string): Promise<string> {
   if (!OPENAI_API_KEY) {
     return message.length > 50 ? message.substring(0, 50) + "..." : message
@@ -173,8 +202,8 @@ export async function generateChatTitle(message: string): Promise<string> {
           content: `Create a title for this programming question: "${message}"`
         }
       ],
-      max_tokens: 20,
-      temperature: 0.3,
+      max_tokens: OPENAI_MAX_TOKENS_ANALYSIS,
+      temperature: OPENAI_TEMPERATURE_ANALYSIS,
     })
 
     const title = completion.choices[0]?.message?.content?.trim() || 'Programming Question'

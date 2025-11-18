@@ -1706,16 +1706,26 @@ function MonitoringModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
   const [activityPage, setActivityPage] = useState(1)
   const [logLevel, setLogLevel] = useState<'error' | 'warn' | 'info' | undefined>()
 
-  const { data: errorLogs } = trpc.admin.getErrorLogs.useQuery({
-    page: logsPage,
-    limit: 20,
-    level: logLevel,
-  })
+  const { data: errorLogs, isLoading: errorLogsLoading } = trpc.admin.getErrorLogs.useQuery(
+    {
+      page: logsPage,
+      limit: 20,
+      level: logLevel,
+    },
+    {
+      enabled: isOpen, // Only fetch when modal is open
+    }
+  )
 
-  const { data: adminActivity } = trpc.admin.getAdminActivity.useQuery({
-    page: activityPage,
-    limit: 20,
-  })
+  const { data: adminActivity, isLoading: adminActivityLoading } = trpc.admin.getAdminActivity.useQuery(
+    {
+      page: activityPage,
+      limit: 20,
+    },
+    {
+      enabled: isOpen, // Only fetch when modal is open
+    }
+  )
 
   if (!isOpen) return null
 
@@ -1723,7 +1733,12 @@ function MonitoringModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
       <div className="glass rounded-2xl p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-white">System Monitoring</h2>
+          <div>
+            <h2 className="text-2xl font-bold text-white">System Monitoring</h2>
+            <p className="text-white/50 text-xs mt-1">
+              Logs are stored in memory and reset on server restart
+            </p>
+          </div>
           <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1747,17 +1762,61 @@ function MonitoringModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                 <option value="info">Info</option>
               </select>
             </div>
-            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-              {errorLogs && errorLogs.logs.length > 0 ? (
-                <div className="space-y-2">
-                  {errorLogs.logs.map((log: Record<string, unknown>, idx: number) => (
-                    <div key={idx} className="text-sm text-white/70 font-mono p-2 bg-white/5 rounded">
-                      {JSON.stringify(log, null, 2)}
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10 min-h-[200px] max-h-[400px] overflow-y-auto">
+              {errorLogsLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400 mx-auto"></div>
+                  <p className="mt-2 text-white/50 text-xs">Loading error logs...</p>
+                </div>
+              ) : errorLogs && errorLogs.logs.length > 0 ? (
+                <div className="space-y-3">
+                  {errorLogs.logs.map((log: {
+                    level: string
+                    message: string
+                    timestamp: string
+                    userId?: string
+                    metadata?: Record<string, unknown>
+                  }, idx: number) => (
+                    <div key={idx} className="bg-white/5 rounded-lg p-3 border border-white/10">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                            log.level === 'error' ? 'bg-red-500/20 text-red-300' :
+                            log.level === 'warn' ? 'bg-yellow-500/20 text-yellow-300' :
+                            'bg-blue-500/20 text-blue-300'
+                          }`}>
+                            {log.level.toUpperCase()}
+                          </span>
+                          <span className="text-white/70 text-xs font-mono">
+                            {new Date(log.timestamp).toLocaleString('en-GB', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                        {log.userId && (
+                          <span className="text-white/50 text-xs font-mono">
+                            User: {log.userId.slice(0, 8)}...
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-white text-sm mb-2">{log.message}</p>
+                      {log.metadata && Object.keys(log.metadata).length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-white/10">
+                          <pre className="text-xs text-white/60 font-mono overflow-x-auto">
+                            {JSON.stringify(log.metadata, null, 2)}
+                          </pre>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-white/50 text-sm text-center py-4">No error logs available</p>
+                <p className="text-white/50 text-sm text-center py-8">No error logs available</p>
               )}
             </div>
           </div>
@@ -1765,17 +1824,56 @@ function MonitoringModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
           {/* Admin Activity */}
           <div>
             <h3 className="text-lg font-semibold text-white mb-3">Admin Activity</h3>
-            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-              {adminActivity && adminActivity.activities.length > 0 ? (
-                <div className="space-y-2">
-                  {adminActivity.activities.map((activity: Record<string, unknown>, idx: number) => (
-                    <div key={idx} className="text-sm text-white/70 p-2 bg-white/5 rounded">
-                      {JSON.stringify(activity, null, 2)}
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10 min-h-[200px] max-h-[400px] overflow-y-auto">
+              {adminActivityLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400 mx-auto"></div>
+                  <p className="mt-2 text-white/50 text-xs">Loading admin activity...</p>
+                </div>
+              ) : adminActivity && adminActivity.activities.length > 0 ? (
+                <div className="space-y-3">
+                  {adminActivity.activities.map((activity: {
+                    action: string
+                    timestamp: string
+                    adminUserId?: string
+                    metadata?: Record<string, unknown>
+                  }, idx: number) => (
+                    <div key={idx} className="bg-white/5 rounded-lg p-3 border border-white/10">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 bg-green-500/20 text-green-300 rounded text-xs font-semibold">
+                            ADMIN ACTION
+                          </span>
+                          <span className="text-white/70 text-xs font-mono">
+                            {new Date(activity.timestamp).toLocaleString('en-GB', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                        {activity.adminUserId && (
+                          <span className="text-white/50 text-xs font-mono">
+                            Admin: {activity.adminUserId.slice(0, 8)}...
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-white text-sm mb-2 font-medium">{activity.action}</p>
+                      {activity.metadata && Object.keys(activity.metadata).length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-white/10">
+                          <pre className="text-xs text-white/60 font-mono overflow-x-auto">
+                            {JSON.stringify(activity.metadata, null, 2)}
+                          </pre>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-white/50 text-sm text-center py-4">No admin activity logged</p>
+                <p className="text-white/50 text-sm text-center py-8">No admin activity logged</p>
               )}
             </div>
           </div>

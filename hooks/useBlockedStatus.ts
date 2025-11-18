@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 
 // Simple in-memory cache to avoid duplicate requests
 const blockStatusCache = new Map<string, { isBlocked: boolean; timestamp: number }>()
-const CACHE_DURATION = 60 * 1000 // OPTIMIZATION: Increased to 60 seconds cache to reduce API calls
+const CACHE_DURATION = 30 * 1000 // 30 seconds cache to reduce API calls while still being responsive
 
 // OPTIMIZATION: Global flag to prevent multiple simultaneous requests
 let activeRequest: Promise<boolean> | null = null
@@ -28,29 +28,46 @@ export function useBlockedStatus(options: {
   const [isLoading, setIsLoading] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
 
+  // Use refs to store values that don't need to trigger re-renders
+  const skipPathsRef = useRef(skipPaths)
+  const enabledRef = useRef(enabled)
+  
+  // Update refs when values change (without triggering re-render)
+  useEffect(() => {
+    skipPathsRef.current = skipPaths
+    enabledRef.current = enabled
+  }, [skipPaths, enabled])
+
   const checkBlockStatus = useCallback(async () => {
-    if (!enabled || !isSignedIn || !isLoaded || !user?.id) {
+    const currentEnabled = enabledRef.current
+    const currentSkipPaths = skipPathsRef.current
+    
+    if (!currentEnabled || !isSignedIn || !isLoaded || !user?.id) {
       setIsBlocked(false)
       setIsLoading(false)
       return
     }
 
     // OPTIMIZATION: Check pathname inside callback to avoid recreating function
-    if (skipPaths.some(path => pathname.startsWith(path))) {
+    if (currentSkipPaths.some(path => pathname.startsWith(path))) {
       setIsBlocked(false)
       setIsLoading(false)
       return
     }
 
-    // Check cache first
+    // OPTIMIZATION: Use cache for both blocked and non-blocked users
+    // This reduces API calls while still being responsive
     const cached = blockStatusCache.get(user.id)
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      // Use cache if still valid (for both blocked and non-blocked)
       setIsBlocked(cached.isBlocked)
       setIsLoading(false)
       return
     }
+    // If cache expired or doesn't exist, re-check
 
-    // OPTIMIZATION: If there's already an active request for this user, wait for it
+    // CRITICAL: If there's already an active request for this user, wait for it
+    // This prevents multiple simultaneous requests from different components
     if (activeRequest && activeRequestUserId === user.id) {
       try {
         const blocked = await activeRequest
@@ -65,12 +82,21 @@ export function useBlockedStatus(options: {
 
     // OPTIMIZATION: Don't make request if already loading (prevent duplicate requests)
     if (abortControllerRef.current) {
-      return // Already checking, wait for result
+      // Wait for existing request to complete
+      if (activeRequest && activeRequestUserId === user.id) {
+        activeRequest.then(blocked => {
+          setIsBlocked(blocked)
+          setIsLoading(false)
+        }).catch(() => {
+          setIsBlocked(false)
+          setIsLoading(false)
+        })
+      }
+      return
     }
 
     const controller = new AbortController()
     abortControllerRef.current = controller
-    setIsLoading(true)
 
     // OPTIMIZATION: Create a shared promise for all components to use
     const requestPromise = (async () => {
@@ -78,6 +104,10 @@ export function useBlockedStatus(options: {
         const response = await fetch('/api/check-blocked', {
           cache: 'no-store',
           signal: controller.signal,
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+          },
         })
         
         if (response.ok) {
@@ -115,10 +145,13 @@ export function useBlockedStatus(options: {
     } finally {
       setIsLoading(false)
     }
-  }, [isSignedIn, isLoaded, enabled, user?.id]) // OPTIMIZATION: Removed pathname and skipPaths from deps
+  }, [isSignedIn, isLoaded, user?.id, pathname])
 
   useEffect(() => {
-    if (!isLoaded) return
+    if (!isLoaded) {
+      setIsLoading(false)
+      return
+    }
 
     if (!isSignedIn) {
       setIsBlocked(false)
@@ -131,30 +164,49 @@ export function useBlockedStatus(options: {
       return
     }
 
+    const currentSkipPaths = skipPathsRef.current
+    const currentEnabled = enabledRef.current
+
     // OPTIMIZATION: Check if path should be skipped before making request
-    if (skipPaths.some(path => pathname.startsWith(path))) {
+    if (currentSkipPaths.some(path => pathname.startsWith(path))) {
+      setIsBlocked(false)
+      setIsLoading(false)
+      return
+    }
+
+    // CRITICAL: Set loading state immediately when starting check
+    // This ensures UI shows loading before API call completes
+    if (!currentEnabled) {
       setIsBlocked(false)
       setIsLoading(false)
       return
     }
 
     // OPTIMIZATION: Check cache immediately before making request
+    // Use cache for both blocked and non-blocked users if still valid
     const cached = blockStatusCache.get(user?.id || '')
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      // Use cache if still valid (for both blocked and non-blocked)
       setIsBlocked(cached.isBlocked)
       setIsLoading(false)
       return
     }
+    // If cache expired or doesn't exist, re-check
 
-    // Small delay to avoid checking during sign out and to debounce rapid pathname changes
-    const timeoutId = setTimeout(checkBlockStatus, 150)
+    // CRITICAL: Set loading state BEFORE making request
+    // This ensures UI blocks content immediately
+    setIsLoading(true)
+    
+    // Check immediately for blocked users - no delay needed
+    checkBlockStatus()
+    
     return () => {
-      clearTimeout(timeoutId)
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
       }
     }
-  }, [isLoaded, isSignedIn, checkBlockStatus, pathname, skipPaths, user?.id])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, isSignedIn, pathname, user?.id])
 
   return { isBlocked, isLoading }
 }

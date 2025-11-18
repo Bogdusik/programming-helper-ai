@@ -1,9 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useUser } from '@clerk/nextjs'
 import Link from 'next/link'
 import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
+import { useBlockedStatus } from '../../hooks/useBlockedStatus'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 interface FAQItem {
   question: string
@@ -219,6 +223,12 @@ const faqData: FAQItem[] = [
 ]
 
 export default function FAQPage() {
+  const { isSignedIn, isLoaded } = useUser()
+  const router = useRouter()
+  const { isBlocked, isLoading } = useBlockedStatus({
+    skipPaths: ['/blocked', '/contact'],
+    enabled: isSignedIn && isLoaded,
+  })
   const [openItems, setOpenItems] = useState<Set<number>>(new Set())
   const [selectedCategory, setSelectedCategory] = useState<string>('All')
   
@@ -227,6 +237,18 @@ export default function FAQPage() {
   const filteredFAQs = selectedCategory === 'All' 
     ? faqData 
     : faqData.filter(item => item.category === selectedCategory)
+  
+  // Redirect blocked users to blocked page
+  useEffect(() => {
+    if (isLoaded && isSignedIn && isBlocked) {
+      router.replace('/blocked')
+    }
+  }, [isLoaded, isSignedIn, isBlocked, router])
+
+  // Show loading while checking or redirecting
+  if (!isLoaded || (isSignedIn && isLoading) || (isSignedIn && isBlocked)) {
+    return <LoadingSpinner />
+  }
   
   const toggleItem = (index: number) => {
     const newOpenItems = new Set(openItems)

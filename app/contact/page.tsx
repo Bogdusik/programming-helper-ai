@@ -1,12 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { useUser, SignOutButton } from '@clerk/nextjs'
 import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
 import { trpc } from '../../lib/trpc-client'
-import { useBlockedStatus } from '../../hooks/useBlockedStatus'
+import { useBlockedStatus, clearBlockStatusCache } from '../../hooks/useBlockedStatus'
+import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function ContactPage() {
+  const { isSignedIn, isLoaded, user } = useUser()
+  const router = useRouter()
+  const hasClearedCacheRef = useRef(false)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -15,8 +21,52 @@ export default function ContactPage() {
   })
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState<string>('')
-  const { isBlocked } = useBlockedStatus()
+  
+  // State for block status - we'll check it directly
+  const [isBlockedState, setIsBlockedState] = useState(false)
+  const [isCheckingBlocked, setIsCheckingBlocked] = useState(false)
+  
+  // Clear cache and force check block status on mount
+  useEffect(() => {
+    if (isLoaded && isSignedIn && user?.id) {
+      // Clear cache first
+      if (!hasClearedCacheRef.current) {
+        clearBlockStatusCache(user.id)
+        hasClearedCacheRef.current = true
+      }
+      
+      // Force check block status directly
+      setIsCheckingBlocked(true)
+      fetch('/api/check-blocked', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      })
+        .then(res => res.json())
+        .then(data => {
+          setIsBlockedState(data.isBlocked ?? false)
+          setIsCheckingBlocked(false)
+        })
+        .catch(err => {
+          console.error('Error checking block status:', err)
+          setIsBlockedState(false)
+          setIsCheckingBlocked(false)
+        })
+    }
+  }, [isLoaded, isSignedIn, user?.id])
+  
+  // Also use hook for consistency
+  const { isBlocked: isBlockedFromHook } = useBlockedStatus({
+    skipPaths: [], // Don't skip /contact - we need to check block status here
+    enabled: isSignedIn && isLoaded,
+  })
+  
+  // Use the direct check result, fallback to hook result
+  const isBlocked = isBlockedState || isBlockedFromHook
 
+  // All hooks must be called before any conditional returns
   const sendMessageMutation = trpc.contact.sendMessage.useMutation({
     onSuccess: () => {
       setSubmitStatus('success')
@@ -56,12 +106,26 @@ export default function ContactPage() {
     }))
   }
 
+  // For blocked users, don't show Navbar at all - they should only see contact form
+  // Also adjust padding since there's no navbar
+  // Force hide Navbar if blocked (double check)
+  const shouldShowNavbar = !isBlocked && isLoaded && isSignedIn
+
+  // Show loading while checking block status (AFTER all hooks)
+  if (isSignedIn && isLoaded && isCheckingBlocked) {
+    return <LoadingSpinner />
+  }
+  
+  // Note: We don't redirect blocked users from /contact page
+  // They are allowed to be here to contact support
+  // But Navbar and Footer links are hidden based on isBlocked
+  
   return (
     <div className="min-h-screen bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden">
-      {!isBlocked && <Navbar />}
+      {shouldShowNavbar && <Navbar />}
       <MinimalBackground />
 
-      <div className="relative pt-20 pb-16 min-h-screen flex items-center">
+      <div className={`relative min-h-screen flex items-center ${isBlocked ? 'pt-8 pb-16' : 'pt-20 pb-16'}`}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold text-white mb-4">Contact Us</h1>
@@ -183,6 +247,20 @@ export default function ContactPage() {
               </div>
             </div>
           </div>
+          
+          {/* Log Out button for blocked users */}
+          {isBlocked && isSignedIn && isLoaded && (
+            <div className="mt-8 flex justify-center">
+              <SignOutButton redirectUrl="/">
+                <button className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Log Out
+                </button>
+              </SignOutButton>
+            </div>
+          )}
         </div>
       </div>
     </div>

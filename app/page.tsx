@@ -12,12 +12,25 @@ import ResearchConsent from '../components/ResearchConsent'
 import { trpc } from '../lib/trpc-client'
 import { hasGivenConsent, saveConsentToStorage } from '../lib/research-consent'
 import { formatTimeAgo } from '../lib/utils'
+import { useBlockedStatus } from '../hooks/useBlockedStatus'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 export default function Home() {
   const { isSignedIn, isLoaded, user } = useUser()
   const router = useRouter()
+  const { isBlocked, isLoading: isCheckingBlocked } = useBlockedStatus({
+    skipPaths: ['/blocked', '/contact'],
+    enabled: isSignedIn && isLoaded,
+  })
   const [showConsent, setShowConsent] = useState(false)
   const [hasConsent, setHasConsent] = useState(false)
+  
+  // Redirect blocked users to blocked page
+  useEffect(() => {
+    if (isLoaded && isSignedIn && isBlocked) {
+      router.replace('/blocked')
+    }
+  }, [isLoaded, isSignedIn, isBlocked, router])
   
   const { data: globalStats, isLoading: statsLoading, dataUpdatedAt, error: statsError } = trpc.stats.getGlobalStats.useQuery(undefined, {
     refetchInterval: 60000, // Increased to 1 minute for better performance
@@ -50,6 +63,11 @@ export default function Home() {
     saveConsentToStorage(consent)
     setHasConsent(consent)
     setShowConsent(false)
+  }
+
+  // Show loading while checking block status or redirecting
+  if (isSignedIn && (isCheckingBlocked || isBlocked)) {
+    return <LoadingSpinner />
   }
 
   return (

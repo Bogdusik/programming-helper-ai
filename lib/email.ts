@@ -1,18 +1,12 @@
 import { Resend } from 'resend'
 import { logger } from './logger'
+import { escapeHtml } from './utils'
 
-// Escape HTML to prevent XSS attacks
-function escapeHtml(text: string): string {
-  const map: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;',
-  }
-  return text.replace(/[&<>"']/g, (m) => map[m])
-}
-
+/**
+ * Send contact form email notification
+ * @param data - Contact form data (name, email, subject, message)
+ * @returns Object with success status and optional error message
+ */
 export async function sendContactEmail(data: {
   name: string
   email: string

@@ -7,11 +7,16 @@ import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { trpc } from '../../lib/trpc-client'
+import { useBlockedStatus } from '../../hooks/useBlockedStatus'
 import toast from 'react-hot-toast'
 
 export default function TasksPage() {
   const { isSignedIn, isLoaded } = useUser()
   const router = useRouter()
+  const { isBlocked, isLoading: isCheckingBlocked } = useBlockedStatus({
+    skipPaths: ['/blocked', '/contact'],
+    enabled: isSignedIn && isLoaded,
+  })
   const [selectedLanguage, setSelectedLanguage] = useState<string | undefined>()
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | undefined>()
   
@@ -107,10 +112,16 @@ export default function TasksPage() {
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       router.push('/')
+      return
     }
-  }, [isLoaded, isSignedIn, router])
+    
+    // Redirect blocked users to blocked page
+    if (isLoaded && isSignedIn && isBlocked) {
+      router.replace('/blocked')
+    }
+  }, [isLoaded, isSignedIn, isBlocked, router])
 
-  if (!isLoaded || isLoading) {
+  if (!isLoaded || isLoading || (isSignedIn && isCheckingBlocked) || (isSignedIn && isBlocked)) {
     return <LoadingSpinner />
   }
 
