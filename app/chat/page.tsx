@@ -8,7 +8,7 @@ import ChatBox from '../../components/ChatBox'
 import ChatSidebar from '../../components/ChatSidebar'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import LanguageSelector from '../../components/LanguageSelector'
-import { hasGivenConsent } from '../../lib/research-consent'
+import { hasGivenConsent, saveConsentToStorage } from '../../lib/research-consent'
 import { trpc } from '../../lib/trpc-client'
 import { useBlockedStatus } from '../../hooks/useBlockedStatus'
 import toast from 'react-hot-toast'
@@ -17,12 +17,13 @@ import toast from 'react-hot-toast'
 const OnboardingTour = lazy(() => import('../../components/OnboardingTour'))
 const AssessmentModal = lazy(() => import('../../components/AssessmentModal'))
 const UserProfileModal = lazy(() => import('../../components/UserProfileModal'))
+const ResearchConsent = lazy(() => import('../../components/ResearchConsent'))
 
 import type { AssessmentQuestion } from '../../components/AssessmentModal'
 import type { ProfileData } from '../../components/UserProfileModal'
 
 export default function ChatPage() {
-  const { isSignedIn, isLoaded } = useUser()
+  const { isSignedIn, isLoaded, user } = useUser()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [currentSessionId, setCurrentSessionId] = useState<string | undefined>()
@@ -31,6 +32,7 @@ export default function ChatPage() {
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showPreAssessment, setShowPreAssessment] = useState(false)
+  const [showResearchConsent, setShowResearchConsent] = useState(false)
   const [assessmentQuestions, setAssessmentQuestions] = useState<AssessmentQuestion[]>([])
   const [taskInitialized, setTaskInitialized] = useState(false)
   
@@ -44,13 +46,14 @@ export default function ChatPage() {
   const { data: userProfile, refetch: refetchProfile, error: profileError } = trpc.profile.getProfile.useQuery(undefined, {
     enabled: isSignedIn,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    onError: (error) => {
-      // If user is blocked, redirect to blocked page
-      if (error.data?.code === 'FORBIDDEN' && error.message === 'User account is blocked') {
-        router.push('/blocked')
-      }
-    },
   })
+  
+  // Handle profile error separately (onError is not supported in newer tRPC versions)
+  useEffect(() => {
+    if (profileError?.data?.code === 'FORBIDDEN' && profileError.message === 'User account is blocked') {
+      router.push('/blocked')
+    }
+  }, [profileError, router])
   
   const { data: onboardingStatus } = trpc.onboarding.getOnboardingStatus.useQuery(undefined, {
     enabled: isSignedIn,
@@ -62,7 +65,11 @@ export default function ChatPage() {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   })
   
-  const utils = trpc.useUtils()
+  // Extract pre-assessment check to avoid type inference issues
+  const hasPreAssessment = useMemo(() => {
+    return preAssessment?.some(a => a.type === 'pre') ?? false
+  }, [preAssessment])
+  
   // Calculate chat height once and keep it fixed - use useMemo to prevent recalculation
   const chatHeight = useMemo(() => {
     if (typeof window !== 'undefined') {
@@ -128,36 +135,31 @@ export default function ChatPage() {
           // Only send message if this is a new task start (both taskId and sessionId in URL, and no messages)
           const taskMessage = `I want to work on this task:\n\n**${taskData.title}**\n\n${taskData.description}\n\nLanguage: ${taskData.language}\nDifficulty: ${taskData.difficulty}\n\nPlease help me solve this task.`
           
-          sendMessageMutation.mutate(
-            {
-              message: taskMessage,
-              sessionId: currentSessionId,
-            },
-            {
-              onSuccess: (result) => {
-                setTaskInitialized(true)
-                // If a new session was created (session was missing), update currentSessionId
-                if (result.sessionId && result.sessionId !== currentSessionId) {
-                  setCurrentSessionId(result.sessionId)
-                  // Update task progress with new session ID
-                  if (taskId) {
-                    updateProgressMutation.mutate({
-                      taskId: taskId,
-                      chatSessionId: result.sessionId,
-                    })
-                  }
-                }
-                // Remove taskId from URL after initialization
-                const newUrl = new URL(window.location.href)
-                newUrl.searchParams.delete('taskId')
-                router.replace(newUrl.pathname + newUrl.search)
-              },
-              onError: (error) => {
-                console.error('Error sending task message:', error)
-                setTaskInitialized(true)
+          // Use mutateAsync to avoid complex type inference in dependencies
+          sendMessageMutation.mutateAsync({
+            message: taskMessage,
+            sessionId: currentSessionId,
+          }).then((result) => {
+            setTaskInitialized(true)
+            // If a new session was created (session was missing), update currentSessionId
+            if (result.sessionId && result.sessionId !== currentSessionId) {
+              setCurrentSessionId(result.sessionId)
+              // Update task progress with new session ID
+              if (taskId) {
+                updateProgressMutation.mutate({
+                  taskId: taskId,
+                  chatSessionId: result.sessionId,
+                })
               }
             }
-          )
+            // Remove taskId from URL after initialization
+            const newUrl = new URL(window.location.href)
+            newUrl.searchParams.delete('taskId')
+            router.replace(newUrl.pathname + newUrl.search)
+          }).catch((error) => {
+            console.error('Error sending task message:', error)
+            setTaskInitialized(true)
+          })
         }
       }, 500) // Wait 500ms for session to be fully ready and rendered
       
@@ -167,7 +169,25 @@ export default function ChatPage() {
       // Only mark as initialized if messages are loaded (not loading)
       setTaskInitialized(true)
     }
-  }, [taskData, currentSessionId, taskInitialized, isSignedIn, sendMessageMutation, updateProgressMutation, router, taskId, sessionIdFromUrl, existingMessages, isLoadingMessages])
+  }, [taskData?.id, currentSessionId, taskInitialized, isSignedIn, taskId, sessionIdFromUrl, existingMessages?.length, isLoadingMessages])
+
+  // Separate useEffect specifically for Research Consent - highest priority
+  // This runs independently to ensure it shows immediately for new users
+  useEffect(() => {
+    if (isLoaded && isSignedIn && user?.id) {
+      const consentGiven = hasGivenConsent(user.id)
+      if (!consentGiven) {
+        // Show research consent immediately for new users
+        setShowResearchConsent(true)
+      } else {
+        // Hide research consent if already given
+        setShowResearchConsent(false)
+      }
+    } else if (isLoaded && isSignedIn && !user?.id) {
+      // User signed in but ID not loaded yet - wait
+      setShowResearchConsent(false)
+    }
+  }, [isLoaded, isSignedIn, user?.id])
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -187,14 +207,32 @@ export default function ChatPage() {
       return
     }
     
-    // Check research consent
-    if (isLoaded && isSignedIn && !hasGivenConsent()) {
-      router.push('/')
+    // Don't show other modals if research consent is showing
+    if (showResearchConsent) {
+      setShowProfileModal(false)
+      setShowPreAssessment(false)
+      setShowOnboarding(false)
       return
     }
     
-    // Order: Profile → Pre-Assessment → Onboarding Tour
-    if (isLoaded && isSignedIn && userProfile) {
+    // Only proceed with other steps if consent is given AND user ID is available
+    if (!isLoaded || !isSignedIn || !user?.id) {
+      return
+    }
+    
+    // Double-check consent before proceeding (safety check)
+    const consentGiven = hasGivenConsent(user.id)
+    if (!consentGiven) {
+      // Consent not given - show research consent
+      setShowResearchConsent(true)
+      setShowProfileModal(false)
+      setShowPreAssessment(false)
+      setShowOnboarding(false)
+      return
+    }
+    
+    // Order: Profile → Pre-Assessment → Onboarding Tour (after consent)
+    if (userProfile) {
       // Step 1: Show profile modal if not completed
       if (!userProfile.profileCompleted) {
         setShowProfileModal(true)
@@ -202,7 +240,7 @@ export default function ChatPage() {
         setShowPreAssessment(false)
       }
       // Step 2: Show pre-assessment if profile completed but no pre-assessment
-      else if (userProfile.profileCompleted && !preAssessment?.find(a => a.type === 'pre')) {
+      else if (userProfile.profileCompleted && !hasPreAssessment) {
         setShowProfileModal(false)
         setShowOnboarding(false)
         // Only load questions if not already loading and not already shown
@@ -211,36 +249,41 @@ export default function ChatPage() {
         }
       }
       // Step 3: Show onboarding tour if profile and pre-assessment are done, but tour not completed
-      else if (userProfile.profileCompleted && preAssessment?.find(a => a.type === 'pre') && onboardingStatus) {
+      else if (userProfile.profileCompleted && hasPreAssessment && onboardingStatus && !onboardingStatus.onboardingCompleted) {
         setShowProfileModal(false)
         setShowPreAssessment(false)
-        if (!onboardingStatus.onboardingCompleted) {
-          setShowOnboarding(true)
-        } else {
-          // All steps completed - hide all modals
-          setShowOnboarding(false)
-          setShowProfileModal(false)
-          setShowPreAssessment(false)
-        }
-      } else {
-        // All steps completed - hide all modals (fallback)
+        setShowOnboarding(true)
+      }
+      // All steps completed - hide all modals
+      else {
         setShowProfileModal(false)
         setShowPreAssessment(false)
         setShowOnboarding(false)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded, isSignedIn, router, onboardingStatus, userProfile, preAssessment, showPreAssessment, assessmentQuestions.length])
+  }, [isLoaded, isSignedIn, router, onboardingStatus, userProfile, hasPreAssessment, showPreAssessment, assessmentQuestions.length, user?.id, isBlocked, profileError])
 
   const loadPreAssessmentQuestions = async () => {
     try {
       const questions = await getQuestionsMutation.mutateAsync({
         type: 'pre',
-        language: userProfile?.primaryLanguage || undefined,
+        language: userProfile?.primaryLanguage ?? undefined,
       })
-      setAssessmentQuestions(questions as AssessmentQuestion[])
+      // Transform questions to AssessmentQuestion format explicitly
+      const transformedQuestions: AssessmentQuestion[] = questions.map((q: any) => ({
+        id: q.id,
+        question: q.question,
+        type: q.type as 'multiple_choice' | 'code_snippet' | 'conceptual',
+        options: Array.isArray(q.options) ? q.options : (q.options ? [q.options] : undefined),
+        correctAnswer: q.correctAnswer,
+        category: q.category,
+        difficulty: q.difficulty,
+        explanation: q.explanation || undefined,
+      }))
+      setAssessmentQuestions(transformedQuestions)
       // Show pre-assessment modal after questions are loaded
-      if (questions && questions.length > 0) {
+      if (transformedQuestions.length > 0) {
         setShowPreAssessment(true)
       }
     } catch (error) {
@@ -288,11 +331,15 @@ export default function ChatPage() {
     }
   }
 
+  const utils = trpc.useUtils()
+  
   const handleOnboardingComplete = async () => {
     setShowOnboarding(false)
     await updateOnboardingMutation.mutateAsync({
       completed: true,
     })
+    // Invalidate onboarding status to trigger refetch
+    await utils.onboarding.getOnboardingStatus.invalidate()
   }
 
   const handleOnboardingSkip = async () => {
@@ -300,6 +347,24 @@ export default function ChatPage() {
     await updateOnboardingMutation.mutateAsync({
       completed: true,
     })
+    // Invalidate onboarding status to trigger refetch
+    await utils.onboarding.getOnboardingStatus.invalidate()
+  }
+
+  const handleResearchConsent = (consent: boolean) => {
+    if (user?.id) {
+      saveConsentToStorage(consent, user.id)
+    } else {
+      saveConsentToStorage(consent)
+    }
+    setShowResearchConsent(false)
+    if (!consent) {
+      // If user declines, redirect to home page
+      router.push('/')
+    } else {
+      // If consent given, trigger refetch to show profile modal
+      refetchProfile()
+    }
   }
 
   const handleLanguagesChange = async (languages: string[], primary?: string) => {
@@ -379,7 +444,7 @@ export default function ChatPage() {
               confidence: userProfile.initialConfidence || 3,
               aiExperience: userProfile.aiExperience || '',
               preferredLanguages: userProfile.preferredLanguages || [],
-              primaryLanguage: userProfile.primaryLanguage,
+              primaryLanguage: userProfile.primaryLanguage ?? undefined,
             } : undefined}
           />
         </Suspense>
@@ -394,19 +459,26 @@ export default function ChatPage() {
             onSubmit={handleAssessmentSubmit}
             type="pre"
             questions={assessmentQuestions}
-            language={userProfile?.primaryLanguage}
+            language={userProfile?.primaryLanguage ?? undefined}
           />
         </Suspense>
       )}
 
       {/* Onboarding Tour - Step 3 */}
-      {showOnboarding && !showProfileModal && !showPreAssessment && (
+      {showOnboarding && !showProfileModal && !showPreAssessment && !showResearchConsent && (
         <Suspense fallback={null}>
           <OnboardingTour
             isActive={showOnboarding}
             onComplete={handleOnboardingComplete}
             onSkip={handleOnboardingSkip}
           />
+        </Suspense>
+      )}
+
+      {/* Research Consent Modal - Step 1 (FIRST, before everything else) */}
+      {showResearchConsent && (
+        <Suspense fallback={null}>
+          <ResearchConsent onConsent={handleResearchConsent} />
         </Suspense>
       )}
       

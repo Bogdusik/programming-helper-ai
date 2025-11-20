@@ -15,8 +15,9 @@ export const db = globalForPrisma.prisma ?? new PrismaClient({
   },
 })
 
-// Enable connection pooling hints
-if (process.env.NODE_ENV !== 'production') {
+// Reuse Prisma client across requests (important for production)
+// This prevents creating multiple connections
+if (!globalForPrisma.prisma) {
   globalForPrisma.prisma = db
 }
 

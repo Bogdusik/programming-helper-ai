@@ -10,16 +10,19 @@ export default function ProgressDashboard() {
   const [showPostAssessment, setShowPostAssessment] = useState(false)
   const [assessmentQuestions, setAssessmentQuestions] = useState<AssessmentQuestion[]>([])
   
-  const { data: userProfile } = trpc.profile.getProfile.useQuery()
-  const { data: stats } = trpc.stats.getUserStats.useQuery()
-  const { data: languageProgress } = trpc.profile.getLanguageProgress.useQuery()
-  const { data: eligibility } = trpc.assessment.checkPostAssessmentEligibility.useQuery()
-  const { data: assessments } = trpc.assessment.getAssessments.useQuery()
+  const { data: userProfile, isLoading: profileLoading } = trpc.profile.getProfile.useQuery()
+  const { data: stats, isLoading: statsLoading } = trpc.stats.getUserStats.useQuery()
+  const { data: languageProgress, isLoading: languageProgressLoading } = trpc.profile.getLanguageProgress.useQuery()
+  const { data: eligibility, isLoading: eligibilityLoading } = trpc.assessment.checkPostAssessmentEligibility.useQuery()
+  const { data: assessments, isLoading: assessmentsLoading } = trpc.assessment.getAssessments.useQuery()
   
   const getQuestionsMutation = trpc.assessment.getQuestions.useMutation()
   const submitAssessmentMutation = trpc.assessment.submitAssessment.useMutation()
 
-  if (!userProfile || !stats) {
+  // Show loading only if critical data is still loading
+  const isLoading = profileLoading || statsLoading
+  
+  if (isLoading || !userProfile || !stats) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

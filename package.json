@@ -6,10 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "type-check": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --maxWorkers=2",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:push:force": "prisma db push --accept-data-loss",
@@ -18,7 +21,9 @@
     "db:start": "brew services start postgresql@14",
     "db:stop": "brew services stop postgresql@14",
     "db:status": "brew services list | grep postgresql || echo 'PostgreSQL service not found'",
-    "db:setup": "npm run db:start && sleep 2 && npm run db:push"
+    "db:setup": "npm run db:start && sleep 2 && npm run db:push",
+    "prebuild": "npm run db:generate",
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

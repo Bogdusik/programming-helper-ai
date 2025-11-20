@@ -44,5 +44,12 @@ next-env.d.ts
 # prisma
 /src/generated/prisma
 
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
 # research documentation
 RESEARCH_ETHICS.md

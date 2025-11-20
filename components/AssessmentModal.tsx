@@ -25,7 +25,7 @@ export interface AssessmentQuestion {
 export interface AssessmentAnswer {
   questionId: string
   answer: string
-  isCorrect: boolean
+  isCorrect?: boolean // Optional - server will check for open questions
 }
 
 export default function AssessmentModal({
@@ -71,11 +71,24 @@ export default function AssessmentModal({
       setCurrentQuestion(currentQuestion + 1)
     } else {
       // Calculate results
-      const assessmentAnswers: AssessmentAnswer[] = questions.map(q => ({
-        questionId: q.id,
-        answer: answers[q.id] || '',
-        isCorrect: answers[q.id] === q.correctAnswer
-      }))
+      // For multiple_choice, check on client. For open questions, server will check with AI
+      const assessmentAnswers: AssessmentAnswer[] = questions.map(q => {
+        const userAnswer = answers[q.id] || ''
+        let isCorrect: boolean | undefined
+        
+        // Only check multiple_choice on client (exact match)
+        // For code_snippet and conceptual, let server check with AI
+        if (q.type === 'multiple_choice') {
+          isCorrect = userAnswer === q.correctAnswer
+        }
+        // For open questions, don't set isCorrect - server will check with AI
+        
+        return {
+          questionId: q.id,
+          answer: userAnswer,
+          isCorrect: isCorrect
+        }
+      })
       onSubmit(assessmentAnswers, confidence)
     }
   }, [currentQuestion, questions.length, questions, answers, confidence, onSubmit])

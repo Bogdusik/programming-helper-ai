@@ -18,7 +18,25 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "coverage/**",
+      "*.config.js",
+      "*.config.mjs",
     ],
+  },
+  {
+    rules: {
+      // Prevent console.log in production code (allow console.error and console.warn)
+      "no-console": ["warn", { allow: ["warn", "error"] }],
+      // Enforce consistent imports
+      "no-unused-vars": "off", // TypeScript handles this
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
+    },
   },
 ];
 

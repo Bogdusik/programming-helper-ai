@@ -26,7 +26,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     console.error('ErrorBoundary caught an error:', error, errorInfo)
     
     // Log error to monitoring service (e.g., Sentry)
-    // logErrorToService(error, errorInfo)
+    // In production, integrate with error tracking service
+    if (process.env.NODE_ENV === 'production') {
+      // Example: Sentry.captureException(error, { contexts: { react: errorInfo } })
+      // For now, log to console but in production should send to monitoring service
+    }
   }
 
   resetError = () => {

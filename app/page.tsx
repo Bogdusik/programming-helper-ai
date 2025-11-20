@@ -45,22 +45,45 @@ export default function Home() {
     return formatTimeAgo(dataUpdatedAt)
   }, [dataUpdatedAt])
 
+  // Get user profile and onboarding status to determine if consent should be shown here
+  const { data: userProfile } = trpc.profile.getProfile.useQuery(undefined, {
+    enabled: isSignedIn && isLoaded,
+    staleTime: 5 * 60 * 1000,
+  })
+  const { data: onboardingStatus } = trpc.onboarding.getOnboardingStatus.useQuery(undefined, {
+    enabled: isSignedIn && isLoaded,
+    staleTime: 10 * 60 * 1000,
+  })
+
   useEffect(() => {
     // Check if user has given research consent
-    if (isLoaded && isSignedIn) {
-      const consent = hasGivenConsent()
+    // Only show consent on home page if:
+    // 1. User hasn't given consent yet
+    // 2. User hasn't completed profile yet (new user) OR hasn't completed onboarding yet
+    // This ensures consent is shown on chat page after onboarding for users who completed profile
+    if (isLoaded && isSignedIn && user?.id) {
+      const consent = hasGivenConsent(user.id)
       setHasConsent(consent)
       if (!consent) {
-        setShowConsent(true)
+        // Show consent on home page only for new users who haven't started onboarding
+        // If user has completed profile/onboarding, consent will be shown on chat page
+        const shouldShowOnHome = !userProfile?.profileCompleted || !onboardingStatus?.onboardingCompleted
+        if (shouldShowOnHome) {
+          setShowConsent(true)
+        }
       }
     }
-  }, [isLoaded, isSignedIn])
+  }, [isLoaded, isSignedIn, user?.id, userProfile?.profileCompleted, onboardingStatus?.onboardingCompleted])
 
   // Profile modal removed from home page - it will be shown on chat page
 
 
   const handleConsent = (consent: boolean) => {
-    saveConsentToStorage(consent)
+    if (user?.id) {
+      saveConsentToStorage(consent, user.id)
+    } else {
+      saveConsentToStorage(consent)
+    }
     setHasConsent(consent)
     setShowConsent(false)
   }

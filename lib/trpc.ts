@@ -2,7 +2,7 @@ import { initTRPC, TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { db } from './db'
 import { getCurrentUser } from './auth'
-import { generateResponse, generateChatTitle, analyzeQuestionType } from './openai'
+import { generateResponse, generateChatTitle, analyzeQuestionType, checkAssessmentAnswer } from './openai'
 import { detectLanguage } from './prompts'
 import { rateLimit } from './rate-limit'
 import { logger } from './logger'
@@ -584,34 +584,42 @@ export const appRouter = router({
       .query(async ({ ctx }) => {
         const { user } = ctx
         
-        const stats = await db.stats.findUnique({
+        let stats = await db.stats.findUnique({
           where: { userId: user.id },
         })
 
-        // OPTIMIZATION: Fix any discrepancies in tasksCompleted count
-        // Recalculate from actual data to ensure accuracy
-        if (stats) {
-          const actualCompletedTasks = await db.userTaskProgress.count({
-            where: {
+        // Create stats record if it doesn't exist (for new users)
+        if (!stats) {
+          stats = await db.stats.create({
+            data: {
               userId: user.id,
-              status: 'completed',
+              questionsAsked: 0,
+              avgResponseTime: 0,
+              totalTimeSpent: 0,
+              tasksCompleted: 0,
+              languagesUsed: [],
             },
           })
+          return stats
+        }
 
-          // If count doesn't match, fix it
-          if (stats.tasksCompleted !== actualCompletedTasks) {
-            await db.stats.update({
-              where: { userId: user.id },
-              data: {
-                tasksCompleted: actualCompletedTasks,
-              },
-            })
-            // Return corrected stats
-            return {
-              ...stats,
+        // OPTIMIZATION: Fix any discrepancies in tasksCompleted count
+        // Recalculate from actual data to ensure accuracy
+        const actualCompletedTasks = await db.userTaskProgress.count({
+          where: {
+            userId: user.id,
+            status: 'completed',
+          },
+        })
+
+        // If count doesn't match, fix it
+        if (stats.tasksCompleted !== actualCompletedTasks) {
+          stats = await db.stats.update({
+            where: { userId: user.id },
+            data: {
               tasksCompleted: actualCompletedTasks,
-            }
-          }
+            },
+          })
         }
 
         return stats
@@ -1323,38 +1331,42 @@ export const appRouter = router({
           })
         }
 
-        // Delete all user data in correct order to respect foreign key constraints
-        await db.message.deleteMany({
-          where: { userId: input.userId }
-        })
+        // Delete all user data in a transaction to ensure atomicity
+        // This prevents race conditions where user might be recreated during deletion
+        await db.$transaction(async (tx) => {
+          // Delete all user data in correct order to respect foreign key constraints
+          await tx.message.deleteMany({
+            where: { userId: input.userId }
+          })
 
-        await db.chatSession.deleteMany({
-          where: { userId: input.userId }
-        })
+          await tx.chatSession.deleteMany({
+            where: { userId: input.userId }
+          })
 
-        await db.assessment.deleteMany({
-          where: { userId: input.userId }
-        })
+          await tx.assessment.deleteMany({
+            where: { userId: input.userId }
+          })
 
-        await db.languageProgress.deleteMany({
-          where: { userId: input.userId }
-        })
+          await tx.languageProgress.deleteMany({
+            where: { userId: input.userId }
+          })
 
-        await db.userTaskProgress.deleteMany({
-          where: { userId: input.userId }
-        })
+          await tx.userTaskProgress.deleteMany({
+            where: { userId: input.userId }
+          })
 
-        await db.stats.deleteMany({
-          where: { userId: input.userId }
-        })
+          await tx.stats.deleteMany({
+            where: { userId: input.userId }
+          })
 
-        await db.userProfile.deleteMany({
-          where: { userId: input.userId }
-        })
+          await tx.userProfile.deleteMany({
+            where: { userId: input.userId }
+          })
 
-        // Finally delete the user
-        await db.user.delete({
-          where: { id: input.userId }
+          // Finally delete the user
+          await tx.user.delete({
+            where: { id: input.userId }
+          })
         })
 
         logger.info('User deleted', ctx.user.id, {
@@ -2113,15 +2125,62 @@ export const appRouter = router({
         answers: z.array(z.object({
           questionId: z.string(),
           answer: z.string(),
-          isCorrect: z.boolean(),
+          isCorrect: z.boolean().optional(), // Optional - will be checked on server for open questions
         })),
         confidence: z.number().min(1).max(5),
       }))
       .mutation(async ({ input, ctx }) => {
         const { user } = ctx
         
-        const score = input.answers.filter(a => a.isCorrect).length
-        const totalQuestions = input.answers.length
+        // Get all questions to check answers properly
+        const questionIds = input.answers.map(a => a.questionId)
+        const questions = await db.assessmentQuestion.findMany({
+          where: { id: { in: questionIds } }
+        })
+        
+        // Create a map for quick lookup
+        const questionMap = new Map(questions.map(q => [q.id, q]))
+        
+        // Check answers - use AI for open questions, exact match for multiple choice
+        const checkedAnswers = await Promise.all(
+          input.answers.map(async (answer) => {
+            const question = questionMap.get(answer.questionId)
+            if (!question) {
+              // If question not found, use client-provided isCorrect
+              return { ...answer, isCorrect: answer.isCorrect ?? false }
+            }
+            
+            // For multiple choice, use exact match (client check is usually correct)
+            if (question.type === 'multiple_choice') {
+              const isCorrect = answer.answer.trim() === question.correctAnswer.trim()
+              return { ...answer, isCorrect }
+            }
+            
+            // For open questions (code_snippet, conceptual), use AI to check
+            if (question.type === 'code_snippet' || question.type === 'conceptual') {
+              try {
+                const isCorrect = await checkAssessmentAnswer(
+                  question.question,
+                  answer.answer,
+                  question.correctAnswer,
+                  question.type as 'code_snippet' | 'conceptual'
+                )
+                return { ...answer, isCorrect }
+              } catch (error) {
+                // Fallback to client-provided value or case-insensitive comparison
+                const isCorrect = answer.isCorrect ?? 
+                  (answer.answer.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase())
+                return { ...answer, isCorrect }
+              }
+            }
+            
+            // Fallback for unknown types
+            return { ...answer, isCorrect: answer.isCorrect ?? false }
+          })
+        )
+        
+        const score = checkedAnswers.filter(a => a.isCorrect).length
+        const totalQuestions = checkedAnswers.length
 
         // Determine assessed level based on score
         const percentage = (score / totalQuestions) * 100
@@ -2137,7 +2196,7 @@ export const appRouter = router({
             score,
             totalQuestions,
             confidence: input.confidence,
-            answers: input.answers as any,
+            answers: checkedAnswers as any,
           },
         })
 

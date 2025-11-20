@@ -179,6 +179,73 @@ export async function analyzeQuestionType(message: string): Promise<string> {
 }
 
 /**
+ * Check if an assessment answer is correct using AI
+ * @param question - The assessment question
+ * @param userAnswer - The user's answer
+ * @param correctAnswer - The expected correct answer
+ * @param questionType - Type of question (multiple_choice, code_snippet, conceptual)
+ * @returns true if answer is correct, false otherwise
+ */
+export async function checkAssessmentAnswer(
+  question: string,
+  userAnswer: string,
+  correctAnswer: string,
+  questionType: 'multiple_choice' | 'code_snippet' | 'conceptual'
+): Promise<boolean> {
+  if (!OPENAI_API_KEY) {
+    // Fallback to exact match if API key not available
+    return userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase()
+  }
+
+  // For multiple choice, use exact match (more reliable)
+  if (questionType === 'multiple_choice') {
+    return userAnswer.trim() === correctAnswer.trim()
+  }
+
+  try {
+    const openai = getOpenAIClient()
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert programming assessment evaluator. Your task is to determine if a student's answer to a programming question is correct.
+
+Rules:
+- For code_snippet questions: Check if the code logic and approach are correct, even if syntax or variable names differ slightly
+- For conceptual questions: Check if the answer demonstrates understanding of the concept, even if worded differently
+- Be lenient: If the answer is essentially correct but worded differently, mark it as correct
+- Only mark as incorrect if the answer is clearly wrong or shows misunderstanding
+
+Return ONLY "true" or "false" (no other text).`
+        },
+        {
+          role: "user",
+          content: `Question: ${question}
+
+Expected correct answer: ${correctAnswer}
+
+Student's answer: ${userAnswer}
+
+Is the student's answer correct? Answer only "true" or "false".`
+        }
+      ],
+      max_tokens: 10,
+      temperature: 0.1, // Low temperature for consistent evaluation
+    })
+
+    const result = completion.choices[0]?.message?.content?.trim().toLowerCase()
+    return result === 'true'
+  } catch (error) {
+    logger.error('Error checking assessment answer with AI', undefined, {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    })
+    // Fallback to case-insensitive comparison
+    return userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase()
+  }
+}
+
+/**
  * Generate a concise title for a chat conversation
  * @param message - The first message in the conversation
  * @returns Generated title (max 50 characters, fallback to truncated message)
