@@ -192,7 +192,7 @@ export default function SettingsPage() {
             confidence: userProfile.initialConfidence || 3,
             aiExperience: userProfile.aiExperience || '',
             preferredLanguages: userProfile.preferredLanguages || [],
-            primaryLanguage: userProfile.primaryLanguage,
+            primaryLanguage: userProfile.primaryLanguage ?? undefined,
           } : undefined}
         />
       )}

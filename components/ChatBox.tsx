@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import Message from './Message'
 import { trpc } from '../lib/trpc-client'
+import type { TaskProgress } from '../lib/trpc-types'
 
 // Scroll animation constants
 const SCROLL_ANIMATION_DURATION_MS = 300 // Animation duration in milliseconds
@@ -54,8 +55,8 @@ export default function ChatBox({ sessionId, taskId, onSessionCreated, onTaskCom
   
   // OPTIMIZATION: Memoize task progress calculations to avoid unnecessary recalculations
   const associatedProgress = useMemo(() => {
-    if (!sessionId) return null
-    return allTaskProgress?.find(progress => {
+    if (!sessionId || !allTaskProgress) return null
+    return (allTaskProgress as any[]).find((progress: any) => {
       const matchesSession = progress.chatSessionId === sessionId
       if (taskId) {
         return matchesSession && progress.taskId === taskId
@@ -195,7 +196,7 @@ export default function ChatBox({ sessionId, taskId, onSessionCreated, onTaskCom
     // Add user message optimistically
     const userMessage = {
       id: `temp-user-${Date.now()}`,
-      role: 'user',
+      role: 'user' as const,
       content: messageToSend,
       timestamp: new Date()
     }
@@ -413,7 +414,7 @@ export default function ChatBox({ sessionId, taskId, onSessionCreated, onTaskCom
                       <span>{messages.length} messages</span>
                     </div>
                   )}
-                  {taskProgress?.attempts > 0 && (
+                  {taskProgress && taskProgress.attempts > 0 && (
                     <div className="flex items-center space-x-1">
                       <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />

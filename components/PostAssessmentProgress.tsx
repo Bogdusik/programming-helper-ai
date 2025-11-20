@@ -2,13 +2,14 @@
 
 import { trpc } from '../lib/trpc-client'
 import { getPostAssessmentMessage } from '../lib/assessment-utils'
+import type { Assessment } from '../lib/trpc-types'
 import Link from 'next/link'
 
 export default function PostAssessmentProgress() {
   const { data: eligibility, isLoading } = trpc.assessment.checkPostAssessmentEligibility.useQuery()
   const { data: assessments } = trpc.assessment.getAssessments.useQuery()
   
-  const postAssessment = assessments?.find(a => a.type === 'post')
+  const postAssessment = (assessments as any[])?.find((a: any) => a.type === 'post')
   
   // Don't show if already completed
   if (postAssessment) {

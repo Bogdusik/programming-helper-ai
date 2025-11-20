@@ -1,5 +1,6 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { TRPCError } from '@trpc/server'
+import { Prisma } from '@prisma/client'
 import { db } from './db'
 
 /**
@@ -24,7 +25,7 @@ export async function getCurrentUser() {
   // Use try-catch with retry logic to handle race conditions where user might be created concurrently
   if (!dbUser) {
     let retries = 5 // Increased retries
-    let lastError: any = null
+    let lastError: Error | null = null
     
     while (retries > 0 && !dbUser) {
       try {
@@ -36,12 +37,18 @@ export async function getCurrentUser() {
           }
         })
         break // Success, exit loop
-      } catch (error: any) {
-        lastError = error
-        // If user was created concurrently (unique constraint error), try to fetch it
-        if (error?.code === 'P2002' || 
-            error?.message?.includes('Unique constraint') || 
-            error?.message?.includes('Unique constraint failed')) {
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error))
+        
+        // Check if it's a Prisma unique constraint error
+        const isUniqueConstraintError = 
+          (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') ||
+          (error instanceof Error && (
+            error.message.includes('Unique constraint') || 
+            error.message.includes('Unique constraint failed')
+          ))
+        
+        if (isUniqueConstraintError) {
           // Wait longer and try to fetch the user again
           await new Promise(resolve => setTimeout(resolve, 300))
           dbUser = await db.user.findUnique({
@@ -76,7 +83,7 @@ export async function getCurrentUser() {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to create or retrieve user after multiple attempts',
-          cause: lastError
+          cause: lastError || undefined
         })
       }
     }

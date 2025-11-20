@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import Navbar from '@/components/Navbar'
 import { trpc } from '@/lib/trpc-client'
+import type { AdminTask } from '@/lib/trpc-types'
 
 export default function AdminPage() {
   const { isSignedIn, isLoaded, user } = useUser()
@@ -53,28 +54,32 @@ export default function AdminPage() {
 
   // Mutations
   const toggleBlockMutation = trpc.admin.toggleUserBlock.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success('User status updated')
+      // OPTIMIZATION: Refetch in parallel if both are needed
+      const refetchPromises: Promise<unknown>[] = []
       if (selectedUserId) {
-        refetchUserDetails()
+        refetchPromises.push(refetchUserDetails())
       }
       if (showUsersModal) {
-        // Refetch users list to update button states
-        refetchUsers()
+        refetchPromises.push(refetchUsers())
+      }
+      if (refetchPromises.length > 0) {
+        await Promise.all(refetchPromises)
       }
     },
   })
 
   const deleteUserMutation = trpc.admin.deleteUser.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success('User deleted successfully')
-      if (showUsersModal) {
-        // Refetch users list
-        refetchUsers()
-      }
+      // OPTIMIZATION: Close modal first, then refetch in parallel if needed
       if (showUserDetailsModal) {
         setShowUserDetailsModal(false)
         setSelectedUserId(null)
+      }
+      if (showUsersModal) {
+        await refetchUsers()
       }
     },
     onError: (error) => {
@@ -535,11 +540,7 @@ export default function AdminPage() {
                                       })
                                     }
                                   }}
-                                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                                    user.isBlocked
-                                      ? 'bg-green-600 hover:bg-green-700 text-white'
-                                      : 'bg-red-600 hover:bg-red-700 text-white'
-                                  }`}
+                                  className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-xs font-medium transition-colors"
                                 >
                                   {user.isBlocked ? 'Unblock' : 'Block'}
                                 </button>
@@ -551,7 +552,7 @@ export default function AdminPage() {
                                       })
                                     }
                                   }}
-                                  className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-xs font-medium transition-colors"
+                                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-xs font-medium transition-colors"
                                 >
                                   Delete
                                 </button>
@@ -667,11 +668,7 @@ export default function AdminPage() {
                             })
                           }
                         }}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          userDetails.isBlocked
-                            ? 'bg-green-600 hover:bg-green-700 text-white'
-                            : 'bg-red-600 hover:bg-red-700 text-white'
-                        }`}
+                        className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm font-medium transition-colors"
                       >
                         {userDetails.isBlocked ? 'Unblock User' : 'Block User'}
                       </button>
@@ -683,7 +680,7 @@ export default function AdminPage() {
                             })
                           }
                         }}
-                        className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm font-medium transition-colors"
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors"
                       >
                         Delete User
                       </button>
@@ -1144,7 +1141,7 @@ function TasksManagementModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
         ) : tasksData && tasksData.tasks.length > 0 ? (
           <>
             <div className="space-y-2 mb-4">
-              {tasksData.tasks.map((task) => (
+              {(tasksData.tasks as any[]).map((task: any) => (
                 <div key={task.id} className="bg-white/5 rounded-lg p-4 border border-white/10 hover:bg-white/10 transition-colors">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -1218,7 +1215,7 @@ function TasksManagementModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
         {/* Create/Edit Task Modal */}
         {(showCreateModal || editingTask) && (
           <TaskFormModal
-            task={editingTask}
+            task={editingTask || undefined}
             onClose={() => {
               setShowCreateModal(false)
               setEditingTask(null)
@@ -1238,15 +1235,15 @@ function TasksManagementModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
 // Task Form Modal Component
 function TaskFormModal({ task, onClose, onSuccess }: { task?: Record<string, unknown>; onClose: () => void; onSuccess: () => void }) {
   const [formData, setFormData] = useState({
-    title: task?.title || '',
-    description: task?.description || '',
-    language: task?.language || '',
-    difficulty: task?.difficulty || 'beginner' as 'beginner' | 'intermediate' | 'advanced',
-    category: task?.category || '',
-    starterCode: task?.starterCode || '',
-    hints: task?.hints || [] as string[],
-    solution: task?.solution || '',
-    isActive: task?.isActive !== undefined ? task.isActive : true,
+    title: (task?.title as string) || '',
+    description: (task?.description as string) || '',
+    language: (task?.language as string) || '',
+    difficulty: ((task?.difficulty as 'beginner' | 'intermediate' | 'advanced') || 'beginner') as 'beginner' | 'intermediate' | 'advanced',
+    category: (task?.category as string) || '',
+    starterCode: (task?.starterCode as string) || '',
+    hints: (task?.hints as string[]) || [] as string[],
+    solution: (task?.solution as string) || '',
+    isActive: task?.isActive !== undefined ? (task.isActive as boolean) : true,
   })
   const [hintInput, setHintInput] = useState('')
 
@@ -1268,7 +1265,7 @@ function TaskFormModal({ task, onClose, onSuccess }: { task?: Record<string, unk
     e.preventDefault()
     if (task) {
       updateMutation.mutate({
-        taskId: task.id,
+        taskId: task.id as string,
         ...formData,
       })
     } else {

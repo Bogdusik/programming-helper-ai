@@ -1,14 +1,16 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { logger } from '@/lib/logger'
 
 // Disable caching for this endpoint to ensure fresh block status
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export async function GET() {
+  let user = null
   try {
-    const user = await currentUser()
+    user = await currentUser()
     
     if (!user) {
       return NextResponse.json({ isBlocked: false }, {
@@ -31,7 +33,10 @@ export async function GET() {
       }
     })
   } catch (error) {
-    console.error('Error checking block status:', error)
+    logger.error('Error checking block status', user?.id, {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    })
     return NextResponse.json({ isBlocked: false }, { 
       status: 500,
       headers: {

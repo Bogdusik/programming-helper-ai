@@ -7,6 +7,7 @@ import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { trpc } from '../../lib/trpc-client'
+import type { Tasks } from '../../lib/trpc-types'
 import { useBlockedStatus } from '../../hooks/useBlockedStatus'
 import toast from 'react-hot-toast'
 
@@ -79,8 +80,8 @@ export default function TasksPage() {
     }
     
     // If we still don't have 5 tasks, fill from remaining tasks regardless of language
-    if (result.length < 5) {
-      const usedTaskIds = new Set(result.map(t => t.id))
+    if (result.length < 5 && allTasks) {
+      const usedTaskIds = new Set((result as any[]).map((t: any) => t.id))
       for (const task of allTasks) {
         if (!usedTaskIds.has(task.id)) {
           result.push(task)
@@ -326,7 +327,7 @@ export default function TasksPage() {
           {tasks && tasks.length > 0 ? (
             <div className="flex justify-center items-center">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-5xl">
-                {tasks.map((task) => {
+                {(tasks as any[]).map((task: any) => {
                 const status = getTaskStatus(task)
                 const isCompleted = isTaskCompleted(task)
                 const inProgress = isTaskInProgress(task)
@@ -382,7 +383,7 @@ export default function TasksPage() {
                         <>
                           <button
                             onClick={async () => {
-                              const progress = task.userProgress?.[0]
+                              const progress = (task as any).userProgress?.[0]
                               if (progress?.chatSessionId) {
                                 // Navigate to existing session WITHOUT taskId to avoid auto-sending message
                                 router.push(`/chat?sessionId=${progress.chatSessionId}`)

@@ -4,7 +4,9 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { trpc } from '../lib/trpc-client'
 import { checkPostAssessmentEligibility, getPostAssessmentMessage } from '../lib/assessment-utils'
+import type { Assessment } from '../lib/trpc-types'
 import AssessmentModal, { AssessmentQuestion } from './AssessmentModal'
+import { logger } from '../lib/logger'
 
 export default function ProgressDashboard() {
   const [showPostAssessment, setShowPostAssessment] = useState(false)
@@ -32,21 +34,19 @@ export default function ProgressDashboard() {
 
   // OPTIMIZATION: Memoize assessment calculations
   const preAssessment = useMemo(() => 
-    assessments?.find(a => a.type === 'pre'),
+    (assessments as any[])?.find((a: any) => a.type === 'pre'),
     [assessments]
   )
   
   const postAssessment = useMemo(() => 
-    assessments?.find(a => a.type === 'post'),
+    (assessments as any[])?.find((a: any) => a.type === 'post'),
     [assessments]
   )
   
-  const improvement = useMemo(() => 
-    postAssessment && preAssessment
-      ? ((postAssessment.score || 0) - (preAssessment.score || 0))
-      : null,
-    [postAssessment, preAssessment]
-  )
+  const improvement = useMemo(() => {
+    if (!postAssessment || !preAssessment) return null
+    return (postAssessment.score || 0) - (preAssessment.score || 0)
+  }, [postAssessment, preAssessment])
 
   // OPTIMIZATION: Memoize days calculation
   const daysSinceRegistration = useMemo(() => 
@@ -62,10 +62,12 @@ export default function ProgressDashboard() {
         type: 'post',
         language: userProfile?.primaryLanguage || undefined,
       })
-      setAssessmentQuestions(questions as AssessmentQuestion[])
+      setAssessmentQuestions((questions as any) as AssessmentQuestion[])
       setShowPostAssessment(true)
     } catch (error) {
-      console.error('Error loading assessment questions:', error)
+      logger.error('Error loading assessment questions', userProfile?.id, {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
     }
   }
 
@@ -99,7 +101,7 @@ export default function ProgressDashboard() {
           onSubmit={handleAssessmentSubmit}
           type="post"
           questions={assessmentQuestions}
-          language={userProfile?.primaryLanguage}
+          language={userProfile?.primaryLanguage ?? undefined}
         />
       )}
     <div className="space-y-4">

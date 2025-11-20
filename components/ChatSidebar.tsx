@@ -7,13 +7,13 @@ import { trpc } from '../lib/trpc-client'
 interface ChatSession {
   id: string
   title: string
-  createdAt: Date
-  updatedAt: Date
+  createdAt: string | Date
+  updatedAt: string | Date
   messages: Array<{
     id: string
     content: string
     role: string
-    timestamp: Date
+    timestamp: string | Date
   }>
 }
 
@@ -184,7 +184,7 @@ export default function ChatSidebar({ currentSessionId, onSessionSelect, onNewCh
                         </div>
                       )}
                       <div className="text-white/50 text-xs mt-1">
-                        {formatDate(session.updatedAt)}
+                        {formatDate(new Date(session.updatedAt))}
                       </div>
                     </div>
                   </div>

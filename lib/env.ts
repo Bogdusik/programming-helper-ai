@@ -1,3 +1,5 @@
+import { logger } from './logger'
+
 /**
  * Required environment variables for the application
  */
@@ -43,7 +45,7 @@ function validateOptionalEnv(): void {
     if (!process.env[key]) {
       // Log warning but don't throw - these are optional
       if (process.env.NODE_ENV === 'development') {
-        console.warn(`Optional environment variable ${key} is not set`)
+        logger.warn(`Optional environment variable ${key} is not set`)
       }
     }
   }

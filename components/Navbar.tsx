@@ -67,7 +67,7 @@ export default function Navbar() {
                     key={link.href}
                     href={link.href}
                     prefetch={true}
-                    {...(link.dataTour ? { 'data-tour': link.dataTour } : {})}
+                    {...('dataTour' in link && link.dataTour ? { 'data-tour': link.dataTour } : {})}
                     className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 hover:shadow-lg ${
                       pathname === link.href
                         ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-500/25'

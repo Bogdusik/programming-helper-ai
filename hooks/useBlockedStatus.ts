@@ -157,7 +157,7 @@ export function useBlockedStatus(options: {
       setIsBlocked(false)
       setIsLoading(false)
       // OPTIMIZATION: Clear active request if user signed out
-      if (activeRequestUserId && activeRequestUserId !== user?.id) {
+      if (activeRequestUserId) {
         activeRequest = null
         activeRequestUserId = null
       }

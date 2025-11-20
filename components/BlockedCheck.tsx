@@ -16,7 +16,7 @@ export default function BlockedCheck({ children }: { children: React.ReactNode }
   
   // OPTIMIZATION: Only clear cache when user actually changes (not on every render)
   // This prevents unnecessary cache clearing that causes extra API calls
-  const prevUserIdRef = useRef<string | undefined>()
+  const prevUserIdRef = useRef<string | undefined>(undefined)
   const isOnBlockedPage = ALLOWED_PATHS_FOR_BLOCKED.some(path => pathname.startsWith(path))
   
   // CRITICAL: Only clear cache when user ID actually changes
