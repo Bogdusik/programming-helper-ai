@@ -253,17 +253,30 @@ function ChatPageContent() {
         }
       }
       // Step 3: Show onboarding tour if profile and pre-assessment are done, but tour not completed
-      // Only show if onboardingStatus is loaded and explicitly false (not undefined/null)
-      else if (userProfile.profileCompleted && hasPreAssessment && onboardingStatus !== undefined && onboardingStatus.onboardingCompleted === false) {
+      // CRITICAL: Only show if:
+      // 1. onboardingStatus is loaded (not undefined/null)
+      // 2. onboardingStatus.onboardingCompleted is explicitly false
+      // 3. Tour is not already showing (prevent duplicate triggers)
+      else if (
+        userProfile.profileCompleted && 
+        hasPreAssessment && 
+        onboardingStatus !== undefined && 
+        onboardingStatus !== null &&
+        onboardingStatus.onboardingCompleted === false &&
+        !showOnboarding // Prevent showing if already showing
+      ) {
         setShowProfileModal(false)
         setShowPreAssessment(false)
         setShowOnboarding(true)
       }
-      // All steps completed - hide all modals
+      // All steps completed OR onboarding is completed - hide all modals
       else {
         setShowProfileModal(false)
         setShowPreAssessment(false)
-        setShowOnboarding(false)
+        // CRITICAL: Hide onboarding if it's completed or if status is true
+        if (onboardingStatus?.onboardingCompleted === true || userProfile.onboardingCompleted === true) {
+          setShowOnboarding(false)
+        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -344,30 +357,46 @@ function ChatPageContent() {
   const handleOnboardingComplete = async () => {
     setShowOnboarding(false)
     try {
+      // Update status in database FIRST
       await updateOnboardingMutation.mutateAsync({
         completed: true,
       })
+      // Wait a bit to ensure database update is committed
+      await new Promise(resolve => setTimeout(resolve, 100))
       // Immediately refetch to get updated status
       await refetchOnboarding()
-      // Also invalidate cache to ensure fresh data on next mount
+      // Also invalidate all related caches to ensure fresh data
       await utils.onboarding.getOnboardingStatus.invalidate()
+      await utils.profile.getProfile.invalidate()
+      // Force a refetch of profile to ensure consistency
+      await refetchProfile()
     } catch (error) {
       console.error('Error completing onboarding:', error)
+      // Even on error, hide the modal to prevent infinite loop
+      setShowOnboarding(false)
     }
   }
 
   const handleOnboardingSkip = async () => {
     setShowOnboarding(false)
     try {
+      // Update status in database FIRST
       await updateOnboardingMutation.mutateAsync({
         completed: true,
       })
+      // Wait a bit to ensure database update is committed
+      await new Promise(resolve => setTimeout(resolve, 100))
       // Immediately refetch to get updated status
       await refetchOnboarding()
-      // Also invalidate cache to ensure fresh data on next mount
+      // Also invalidate all related caches to ensure fresh data
       await utils.onboarding.getOnboardingStatus.invalidate()
+      await utils.profile.getProfile.invalidate()
+      // Force a refetch of profile to ensure consistency
+      await refetchProfile()
     } catch (error) {
       console.error('Error skipping onboarding:', error)
+      // Even on error, hide the modal to prevent infinite loop
+      setShowOnboarding(false)
     }
   }
 
