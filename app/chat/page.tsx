@@ -22,7 +22,8 @@ const ResearchConsent = lazy(() => import('../../components/ResearchConsent'))
 import type { AssessmentQuestion } from '../../components/AssessmentModal'
 import type { ProfileData } from '../../components/UserProfileModal'
 
-export default function ChatPage() {
+// Internal component that uses useSearchParams - must be wrapped in Suspense
+function ChatPageContent() {
   const { isSignedIn, isLoaded, user } = useUser()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -567,5 +568,14 @@ export default function ChatPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Main component that wraps ChatPageContent in Suspense
+export default function ChatPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <ChatPageContent />
+    </Suspense>
   )
 }
