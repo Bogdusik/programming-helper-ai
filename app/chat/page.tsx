@@ -58,9 +58,10 @@ function ChatPageContent() {
     }
   }, [profileError, router])
   
-  const { data: onboardingStatus } = trpc.onboarding.getOnboardingStatus.useQuery(undefined, {
+  const { data: onboardingStatus, refetch: refetchOnboarding } = trpc.onboarding.getOnboardingStatus.useQuery(undefined, {
     enabled: isSignedIn,
-    staleTime: 10 * 60 * 1000, // Cache for 10 minutes (rarely changes)
+    staleTime: 0, // Always fetch fresh data to prevent showing tour multiple times
+    refetchOnMount: 'always', // Always refetch when component mounts
   })
   
   const { data: preAssessment, refetch: refetchAssessment } = trpc.assessment.getAssessments.useQuery(undefined, {
@@ -252,7 +253,8 @@ function ChatPageContent() {
         }
       }
       // Step 3: Show onboarding tour if profile and pre-assessment are done, but tour not completed
-      else if (userProfile.profileCompleted && hasPreAssessment && onboardingStatus && !onboardingStatus.onboardingCompleted) {
+      // Only show if onboardingStatus is loaded and explicitly false (not undefined/null)
+      else if (userProfile.profileCompleted && hasPreAssessment && onboardingStatus !== undefined && onboardingStatus.onboardingCompleted === false) {
         setShowProfileModal(false)
         setShowPreAssessment(false)
         setShowOnboarding(true)
@@ -342,20 +344,32 @@ function ChatPageContent() {
 
   const handleOnboardingComplete = async () => {
     setShowOnboarding(false)
-    await updateOnboardingMutation.mutateAsync({
-      completed: true,
-    })
-    // Invalidate onboarding status to trigger refetch
-    await utils.onboarding.getOnboardingStatus.invalidate()
+    try {
+      await updateOnboardingMutation.mutateAsync({
+        completed: true,
+      })
+      // Immediately refetch to get updated status
+      await refetchOnboarding()
+      // Also invalidate cache to ensure fresh data on next mount
+      await utils.onboarding.getOnboardingStatus.invalidate()
+    } catch (error) {
+      console.error('Error completing onboarding:', error)
+    }
   }
 
   const handleOnboardingSkip = async () => {
     setShowOnboarding(false)
-    await updateOnboardingMutation.mutateAsync({
-      completed: true,
-    })
-    // Invalidate onboarding status to trigger refetch
-    await utils.onboarding.getOnboardingStatus.invalidate()
+    try {
+      await updateOnboardingMutation.mutateAsync({
+        completed: true,
+      })
+      // Immediately refetch to get updated status
+      await refetchOnboarding()
+      // Also invalidate cache to ensure fresh data on next mount
+      await utils.onboarding.getOnboardingStatus.invalidate()
+    } catch (error) {
+      console.error('Error skipping onboarding:', error)
+    }
   }
 
   const handleResearchConsent = (consent: boolean) => {
