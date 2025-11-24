@@ -2,6 +2,7 @@ import { currentUser } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { logger } from '@/lib/logger'
+import { Prisma } from '@prisma/client'
 
 // Temporary endpoint to fix admin role for existing users
 // This should be removed after fixing all users
@@ -27,24 +28,15 @@ export async function GET() {
       }, { status: 403 })
     }
 
-    // Find user in database
-    // First check if role column exists by trying to query it
-    let dbUser
+    // First, ensure role column exists
     try {
-      dbUser = await db.user.findUnique({
-        where: { id: user.id },
-        select: {
-          id: true,
-          role: true,
-        }
-      })
+      await db.$queryRaw`SELECT role FROM users LIMIT 1`
     } catch (error: any) {
       // If role column doesn't exist, try to add it automatically
       if (error?.message?.includes('role') || error?.message?.includes('does not exist')) {
         logger.info('Role column missing, attempting to add it automatically', user.id)
         
         try {
-          // Try to add the column automatically
           await db.$executeRaw`
             ALTER TABLE users 
             ADD COLUMN IF NOT EXISTS role VARCHAR(255) DEFAULT 'user'
@@ -62,15 +54,6 @@ export async function GET() {
           `
           
           logger.info('Role column added automatically', user.id)
-          
-          // Now try to fetch user again
-          dbUser = await db.user.findUnique({
-            where: { id: user.id },
-            select: {
-              id: true,
-              role: true,
-            }
-          })
         } catch (migrationError: any) {
           logger.error('Failed to add role column automatically', user.id, {
             error: migrationError instanceof Error ? migrationError.message : 'Unknown error'
@@ -87,8 +70,54 @@ export async function GET() {
       }
     }
 
+    // Find or create user in database
+    let dbUser = await db.user.findUnique({
+      where: { id: user.id },
+      select: {
+        id: true,
+        role: true,
+      }
+    })
+
+    // If user doesn't exist, create it
     if (!dbUser) {
-      return NextResponse.json({ error: 'User not found in database' }, { status: 404 })
+      logger.info('User not found, creating user in database', user.id)
+      
+      try {
+        dbUser = await db.user.create({
+          data: {
+            id: user.id,
+            role: isAdmin ? 'admin' : 'user',
+            isBlocked: false
+          },
+          select: {
+            id: true,
+            role: true,
+          }
+        })
+        logger.info('User created successfully', user.id, { role: dbUser.role })
+      } catch (error: any) {
+        // If unique constraint error, user was created concurrently, fetch it
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          await new Promise(resolve => setTimeout(resolve, 300))
+          dbUser = await db.user.findUnique({
+            where: { id: user.id },
+            select: {
+              id: true,
+              role: true,
+            }
+          })
+          
+          if (!dbUser) {
+            throw new Error('Failed to create or retrieve user after race condition')
+          }
+        } else {
+          logger.error('Failed to create user', user.id, {
+            error: error instanceof Error ? error.message : 'Unknown error'
+          })
+          throw error
+        }
+      }
     }
 
     // Update role to admin
