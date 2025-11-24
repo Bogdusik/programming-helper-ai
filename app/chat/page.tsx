@@ -34,7 +34,6 @@ function ChatPageContent() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showPreAssessment, setShowPreAssessment] = useState(false)
   const [showResearchConsent, setShowResearchConsent] = useState(false)
-  const [profileModalDismissed, setProfileModalDismissed] = useState(false)
   const [assessmentQuestions, setAssessmentQuestions] = useState<AssessmentQuestion[]>([])
   const [taskInitialized, setTaskInitialized] = useState(false)
   
@@ -45,9 +44,11 @@ function ChatPageContent() {
   })
   
   // OPTIMIZATION: Add staleTime to cache data and improve navigation speed
+  // But use refetchOnMount to ensure fresh data when component mounts
   const { data: userProfile, refetch: refetchProfile, error: profileError } = trpc.profile.getProfile.useQuery(undefined, {
     enabled: isSignedIn,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    refetchOnMount: 'always', // Always refetch when component mounts to get latest profileCompleted status
   })
   
   // Handle profile error separately (onError is not supported in newer tRPC versions)
@@ -235,8 +236,8 @@ function ChatPageContent() {
     
     // Order: Profile → Pre-Assessment → Onboarding Tour (after consent)
     if (userProfile) {
-      // Step 1: Show profile modal if not completed AND not dismissed
-      if (!userProfile.profileCompleted && !profileModalDismissed) {
+      // Step 1: Show profile modal ONLY if not completed (rely on database, not local state)
+      if (!userProfile.profileCompleted) {
         setShowProfileModal(true)
         setShowOnboarding(false)
         setShowPreAssessment(false)
@@ -443,7 +444,6 @@ function ChatPageContent() {
             isOpen={showProfileModal}
             onClose={() => {
         setShowProfileModal(false)
-        setProfileModalDismissed(true)
       }}
             onComplete={handleProfileComplete}
             isOptional={userProfile?.profileCompleted || false}
