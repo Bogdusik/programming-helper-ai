@@ -28,45 +28,61 @@ export async function GET() {
       }, { status: 403 })
     }
 
-    // First, ensure role column exists
-    try {
-      await db.$queryRaw`SELECT role FROM users LIMIT 1`
-    } catch (error: any) {
-      // If role column doesn't exist, try to add it automatically
-      if (error?.message?.includes('role') || error?.message?.includes('does not exist')) {
-        logger.info('Role column missing, attempting to add it automatically', user.id)
+    // First, ensure all required columns exist
+    // Check and add missing columns one by one
+    const requiredColumns = [
+      { name: 'role', type: 'VARCHAR(255)', default: "'user'", notNull: true },
+      { name: 'isBlocked', type: 'BOOLEAN', default: 'false', notNull: true },
+      { name: 'createdAt', type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP', notNull: true },
+      { name: 'updatedAt', type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP', notNull: true },
+      { name: 'onboardingCompleted', type: 'BOOLEAN', default: 'false', notNull: true },
+      { name: 'onboardingStep', type: 'INTEGER', default: '0', notNull: true },
+      { name: 'showTooltips', type: 'BOOLEAN', default: 'true', notNull: true },
+      { name: 'profileCompleted', type: 'BOOLEAN', default: 'false', notNull: true },
+      { name: 'learningGoals', type: 'TEXT[]', default: "'{}'", notNull: false },
+      { name: 'preferredLanguages', type: 'TEXT[]', default: "'{}'", notNull: false },
+    ]
+
+    for (const col of requiredColumns) {
+      try {
+        // Check if column exists
+        const result = await db.$queryRaw<Array<{ column_name: string }>>`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'users' AND column_name = ${col.name}
+        `
         
-        try {
-          await db.$executeRaw`
+        if (result.length === 0) {
+          logger.info(`Adding missing column: ${col.name}`, user.id)
+          
+          // Add column
+          await db.$executeRawUnsafe(`
             ALTER TABLE users 
-            ADD COLUMN IF NOT EXISTS role VARCHAR(255) DEFAULT 'user'
-          `
+            ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type} DEFAULT ${col.default}
+          `)
           
-          await db.$executeRaw`
-            UPDATE users 
-            SET role = 'user' 
-            WHERE role IS NULL
-          `
+          // Update existing rows
+          if (col.notNull) {
+            await db.$executeRawUnsafe(`
+              UPDATE users 
+              SET "${col.name}" = ${col.default} 
+              WHERE "${col.name}" IS NULL
+            `)
+            
+            // Make NOT NULL if required
+            await db.$executeRawUnsafe(`
+              ALTER TABLE users 
+              ALTER COLUMN "${col.name}" SET NOT NULL
+            `)
+          }
           
-          await db.$executeRaw`
-            ALTER TABLE users 
-            ALTER COLUMN role SET NOT NULL
-          `
-          
-          logger.info('Role column added automatically', user.id)
-        } catch (migrationError: any) {
-          logger.error('Failed to add role column automatically', user.id, {
-            error: migrationError instanceof Error ? migrationError.message : 'Unknown error'
-          })
-          
-          return NextResponse.json({ 
-            error: 'Database schema is out of date. The role column does not exist.',
-            solution: 'Please call POST /api/migrate-schema first to add the role column, then try again.',
-            details: 'The database needs to be synced with the Prisma schema. You can either call /api/migrate-schema endpoint or run the SQL script manually.'
-          }, { status: 500 })
+          logger.info(`Column ${col.name} added successfully`, user.id)
         }
-      } else {
-        throw error
+      } catch (colError: any) {
+        logger.error(`Failed to add column ${col.name}`, user.id, {
+          error: colError instanceof Error ? colError.message : 'Unknown error'
+        })
+        // Continue with other columns even if one fails
       }
     }
 
