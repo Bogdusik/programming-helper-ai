@@ -64,23 +64,58 @@ export async function GET() {
       dbInfo.error = err instanceof Error ? err.message : 'Unknown error'
     }
     
+    // Check if connected to Neon (cloud database)
+    const isNeon = dbUrl?.includes('neon.tech') || dbUrl?.includes('neon.tech')
+    const isLocalhost = dbUrl?.includes('localhost')
+    
     return NextResponse.json({
       connection: {
         status: connectionStatus,
         error: error || undefined,
         databaseUrl: maskedUrl,
-        host: dbUrl ? new URL(dbUrl).hostname : undefined
+        host: dbUrl ? new URL(dbUrl).hostname : undefined,
+        type: isNeon ? 'neon' : isLocalhost ? 'localhost' : 'other'
       },
       database: dbInfo,
-      instructions: {
-        toChangeDatabase: [
-          '1. Find your old DATABASE_URL',
-          '2. Go to Vercel Dashboard → Settings → Environment Variables',
-          '3. Update DATABASE_URL with old value',
-          '4. Redeploy the project',
-          '5. Call /api/final-schema-sync to sync schema'
-        ]
-      }
+      status: connectionStatus === 'connected' ? 'ready' : 'error',
+      message: connectionStatus === 'connected' 
+        ? (isNeon 
+          ? '✅ Connected to Neon database. All data has been migrated successfully.' 
+          : isLocalhost 
+          ? '⚠️ Connected to localhost database. This will not work on Vercel. Please use Neon database.'
+          : '✅ Database connected successfully.')
+        : '❌ Database connection failed',
+      instructions: connectionStatus === 'connected' && isNeon
+        ? {
+            message: 'Migration completed successfully!',
+            note: 'All data from your local database has been imported to Neon.',
+            actions: [
+              '✅ Database is ready to use',
+              '✅ All users and messages are available',
+              '✅ No further action needed'
+            ]
+          }
+        : connectionStatus === 'connected' && isLocalhost
+        ? {
+            message: '⚠️ Using localhost database',
+            warning: 'This database will not work on Vercel. You need to use a cloud database (Neon).',
+            actions: [
+              '1. Create a Neon database at https://neon.tech',
+              '2. Export data from localhost using: pg_dump',
+              '3. Import data to Neon using: psql',
+              '4. Update DATABASE_URL in Vercel environment variables',
+              '5. Redeploy the project'
+            ]
+          }
+        : {
+            message: 'Database connection issue',
+            actions: [
+              '1. Check DATABASE_URL environment variable',
+              '2. Verify database credentials',
+              '3. Ensure database is accessible',
+              '4. Check network connectivity'
+            ]
+          }
     })
   } catch (error) {
     logger.error('Error checking database', undefined, {
