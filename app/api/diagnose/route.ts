@@ -182,7 +182,7 @@ export async function GET() {
     }
     
     if (diagnostics.checks.userTableStructure?.missingColumns?.length > 0) {
-      recommendations.push('2. Run POST /api/sync-database to add missing columns')
+      recommendations.push('2. Run POST /api/final-schema-sync to sync database schema')
     }
     
     if (diagnostics.checks.userInDatabase?.exists === false) {
