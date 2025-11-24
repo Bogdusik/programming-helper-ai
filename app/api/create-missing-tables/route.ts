@@ -10,7 +10,37 @@ export async function POST() {
     logger.info('Creating missing tables', undefined)
     
     const createdTables: string[] = []
+    const removedColumns: string[] = []
     const errors: string[] = []
+    
+    // First, remove old columns that are no longer in schema (email, name)
+    try {
+      const userColumns = await db.$queryRaw<Array<{ column_name: string }>>`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users'
+      `
+      
+      const existingColumns = userColumns.map(c => c.column_name)
+      const columnsToRemove = ['email', 'name', 'emailVerified', 'image']
+      
+      for (const col of columnsToRemove) {
+        if (existingColumns.includes(col)) {
+          try {
+            await db.$executeRawUnsafe(`ALTER TABLE users DROP COLUMN IF EXISTS "${col}"`)
+            removedColumns.push(col)
+            logger.info(`Removed column ${col} from users table`, undefined)
+          } catch (error) {
+            errors.push(`Failed to remove column ${col}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Error removing old columns', undefined, {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+      // Don't fail the whole operation if column removal fails
+    }
     
     // Check if stats table exists
     try {
@@ -130,6 +160,7 @@ export async function POST() {
       success: true,
       message: 'Tables created successfully',
       createdTables,
+      removedColumns: removedColumns.length > 0 ? removedColumns : undefined,
       errors: errors.length > 0 ? errors : undefined
     })
   } catch (error) {
