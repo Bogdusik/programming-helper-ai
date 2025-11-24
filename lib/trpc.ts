@@ -2698,14 +2698,24 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const { user } = ctx
         
+        // CRITICAL: Always set onboardingCompleted to the input value
+        // This ensures the status is saved correctly in the database
         const updatedUser = await db.user.update({
           where: { id: user.id },
           data: {
-            onboardingCompleted: input.completed,
+            onboardingCompleted: input.completed, // Explicitly set to input value
             onboardingStep: input.step ?? user.onboardingStep,
             showTooltips: input.showTooltips ?? user.showTooltips,
           },
         })
+
+        // Verify the update was successful
+        if (updatedUser.onboardingCompleted !== input.completed) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to update onboarding status',
+          })
+        }
 
         return updatedUser
       }),
@@ -2714,10 +2724,28 @@ export const appRouter = router({
       .query(async ({ ctx }) => {
         const { user } = ctx
         
+        // CRITICAL: Fetch fresh data from database to ensure we have the latest status
+        // Don't rely on ctx.user which might be cached
+        const dbUser = await db.user.findUnique({
+          where: { id: user.id },
+          select: {
+            onboardingCompleted: true,
+            onboardingStep: true,
+            showTooltips: true,
+          },
+        })
+        
+        if (!dbUser) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'User not found',
+          })
+        }
+        
         return {
-          onboardingCompleted: user.onboardingCompleted,
-          onboardingStep: user.onboardingStep,
-          showTooltips: user.showTooltips,
+          onboardingCompleted: dbUser.onboardingCompleted ?? false,
+          onboardingStep: dbUser.onboardingStep ?? 0,
+          showTooltips: dbUser.showTooltips ?? true,
         }
       }),
   }),
