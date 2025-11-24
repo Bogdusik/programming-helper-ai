@@ -40,46 +40,37 @@ export async function POST() {
       // If users table doesn't exist, create it first
       if (usersTableCheck.length === 0) {
         logger.info('Creating users table (base table)', undefined)
-        await db.$executeRawUnsafe(`
-          CREATE TABLE "users" (
-            "id" TEXT NOT NULL,
-            "role" VARCHAR(255) NOT NULL DEFAULT 'user',
-            "isBlocked" BOOLEAN NOT NULL DEFAULT false,
-            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            "updatedAt" TIMESTAMP(3) NOT NULL,
-            "selfReportedLevel" VARCHAR(255),
-            "assessedLevel" VARCHAR(255),
-            "learningGoals" TEXT[] DEFAULT ARRAY[]::TEXT[],
-            "aiExperience" VARCHAR(255),
-            "initialConfidence" INTEGER,
-            "preferredLanguages" TEXT[] DEFAULT ARRAY[]::TEXT[],
-            "primaryLanguage" VARCHAR(255),
-            "onboardingCompleted" BOOLEAN NOT NULL DEFAULT false,
-            "onboardingStep" INTEGER NOT NULL DEFAULT 0,
-            "showTooltips" BOOLEAN NOT NULL DEFAULT true,
-            "profileCompleted" BOOLEAN NOT NULL DEFAULT false,
-            CONSTRAINT "users_pkey" PRIMARY KEY ("id")
-          )
-        `)
         
-        // Create updatedAt trigger for users
-        await db.$executeRawUnsafe(`
-          CREATE OR REPLACE FUNCTION update_updated_at_column()
-          RETURNS TRIGGER AS $$
-          BEGIN
-            NEW."updatedAt" = CURRENT_TIMESTAMP;
-            RETURN NEW;
-          END;
-          $$ language 'plpgsql';
-        `)
+        // Create users table
+        await db.$executeRawUnsafe(`CREATE TABLE "users" (
+          "id" TEXT NOT NULL,
+          "role" VARCHAR(255) NOT NULL DEFAULT 'user',
+          "isBlocked" BOOLEAN NOT NULL DEFAULT false,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL,
+          "selfReportedLevel" VARCHAR(255),
+          "assessedLevel" VARCHAR(255),
+          "learningGoals" TEXT[] DEFAULT ARRAY[]::TEXT[],
+          "aiExperience" VARCHAR(255),
+          "initialConfidence" INTEGER,
+          "preferredLanguages" TEXT[] DEFAULT ARRAY[]::TEXT[],
+          "primaryLanguage" VARCHAR(255),
+          "onboardingCompleted" BOOLEAN NOT NULL DEFAULT false,
+          "onboardingStep" INTEGER NOT NULL DEFAULT 0,
+          "showTooltips" BOOLEAN NOT NULL DEFAULT true,
+          "profileCompleted" BOOLEAN NOT NULL DEFAULT false,
+          CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+        )`)
         
-        await db.$executeRawUnsafe(`
-          DROP TRIGGER IF EXISTS update_users_updated_at ON "users";
-          CREATE TRIGGER update_users_updated_at
-            BEFORE UPDATE ON "users"
-            FOR EACH ROW
-            EXECUTE FUNCTION update_updated_at_column();
-        `)
+        // Set initial updatedAt for existing rows
+        await db.$executeRawUnsafe(`UPDATE "users" SET "updatedAt" = CURRENT_TIMESTAMP WHERE "updatedAt" IS NULL`)
+        
+        // Create updatedAt trigger function (separate command)
+        await db.$executeRawUnsafe(`CREATE OR REPLACE FUNCTION update_updated_at_column() RETURNS TRIGGER AS $$ BEGIN NEW."updatedAt" = CURRENT_TIMESTAMP; RETURN NEW; END; $$ language 'plpgsql'`)
+        
+        // Create trigger (separate command)
+        await db.$executeRawUnsafe(`DROP TRIGGER IF EXISTS update_users_updated_at ON "users"`)
+        await db.$executeRawUnsafe(`CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON "users" FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`)
         
         results.createdTables.push('users')
         logger.info('Users table created successfully', undefined)
