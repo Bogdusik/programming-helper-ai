@@ -14,6 +14,8 @@ const nextConfig: NextConfig = {
     formats: ['image/avif', 'image/webp'],
     // Disable image optimization in development for faster builds
     unoptimized: process.env.NODE_ENV === 'development',
+    // Enable image optimization in production
+    remotePatterns: [],
   },
   
   // Optimize webpack cache to reduce warning about big strings
@@ -53,6 +55,10 @@ const nextConfig: NextConfig = {
           {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()'
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block'
           }
         ],
       },

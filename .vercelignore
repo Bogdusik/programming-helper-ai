@@ -1,0 +1,44 @@
+# Dependencies
+node_modules
+
+# Testing
+coverage
+__tests__
+
+# Development files
+.env.local
+.env.development
+
+# Build artifacts
+.next
+out
+build
+dist
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Prisma (will be generated during build)
+prisma/migrations
+
