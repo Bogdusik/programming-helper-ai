@@ -26,9 +26,6 @@
     "prebuild": "npm run db:generate",
     "postinstall": "prisma generate"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@clerk/nextjs": "^6.32.2",
     "@prisma/client": "^6.16.2",
