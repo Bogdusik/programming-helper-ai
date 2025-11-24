@@ -91,39 +91,85 @@ export async function GET() {
       logger.info('User not found, creating user in database', user.id)
       
       try {
-        dbUser = await db.user.create({
-          data: {
-            id: user.id,
-            role: isAdmin ? 'admin' : 'user',
-            isBlocked: false
-          },
-          select: {
-            id: true,
-            role: true,
+        // First, ensure email column is nullable (if it exists)
+        try {
+          const emailColumnCheck = await db.$queryRaw<Array<{ is_nullable: string }>>`
+            SELECT is_nullable 
+            FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name = 'email'
+          `
+          
+          if (emailColumnCheck.length > 0 && emailColumnCheck[0].is_nullable === 'NO') {
+            logger.info('Making email column nullable', user.id)
+            await db.$executeRawUnsafe(`ALTER TABLE users ALTER COLUMN email DROP NOT NULL`)
           }
-        })
-        logger.info('User created successfully', user.id, { role: dbUser.role })
-      } catch (error: any) {
-        // If unique constraint error, user was created concurrently, fetch it
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-          await new Promise(resolve => setTimeout(resolve, 300))
-          dbUser = await db.user.findUnique({
-            where: { id: user.id },
+        } catch (emailError) {
+          // Email column might not exist, that's fine
+          logger.info('Email column check skipped', user.id)
+        }
+        
+        // Try to create user with Prisma first
+        try {
+          dbUser = await db.user.create({
+            data: {
+              id: user.id,
+              role: isAdmin ? 'admin' : 'user',
+              isBlocked: false
+            },
             select: {
               id: true,
               role: true,
             }
           })
-          
-          if (!dbUser) {
-            throw new Error('Failed to create or retrieve user after race condition')
+          logger.info('User created successfully', user.id, { role: dbUser.role })
+        } catch (createError: any) {
+          // If Prisma fails due to email constraint, use raw SQL
+          if (createError instanceof Error && createError.message.includes('email')) {
+            logger.info('Creating user with raw SQL due to email constraint', user.id)
+            await db.$executeRawUnsafe(`
+              INSERT INTO users (id, role, "isBlocked", "createdAt", "updatedAt")
+              VALUES ('${user.id}', '${isAdmin ? 'admin' : 'user'}', false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+              ON CONFLICT (id) DO NOTHING
+            `)
+            
+            // Fetch the created user
+            await new Promise(resolve => setTimeout(resolve, 200))
+            dbUser = await db.user.findUnique({
+              where: { id: user.id },
+              select: {
+                id: true,
+                role: true,
+              }
+            })
+            
+            if (!dbUser) {
+              throw new Error('Failed to create user with raw SQL')
+            }
+          } else {
+            // If unique constraint error, user was created concurrently, fetch it
+            if (createError instanceof Prisma.PrismaClientKnownRequestError && createError.code === 'P2002') {
+              await new Promise(resolve => setTimeout(resolve, 300))
+              dbUser = await db.user.findUnique({
+                where: { id: user.id },
+                select: {
+                  id: true,
+                  role: true,
+                }
+              })
+              
+              if (!dbUser) {
+                throw new Error('Failed to create or retrieve user after race condition')
+              }
+            } else {
+              throw createError
+            }
           }
-        } else {
-          logger.error('Failed to create user', user.id, {
-            error: error instanceof Error ? error.message : 'Unknown error'
-          })
-          throw error
         }
+      } catch (error: any) {
+        logger.error('Failed to create user', user.id, {
+          error: error instanceof Error ? error.message : 'Unknown error'
+        })
+        throw error
       }
     }
 

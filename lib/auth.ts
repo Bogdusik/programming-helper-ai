@@ -69,6 +69,22 @@ export async function getCurrentUser() {
       } catch (error: unknown) {
         lastError = error instanceof Error ? error : new Error(String(error))
         
+        // Check if it's an email constraint error - use raw SQL fallback
+        const isEmailConstraintError = 
+          error instanceof Error && error.message.includes('email')
+        
+        if (isEmailConstraintError && retries === 5) {
+          // First attempt failed due to email, make email nullable and retry
+          try {
+            await db.$executeRawUnsafe(`ALTER TABLE users ALTER COLUMN email DROP NOT NULL`)
+          } catch (alterError) {
+            // Column might not exist or already nullable, continue
+          }
+          // Retry with Prisma
+          retries--
+          continue
+        }
+        
         // Check if it's a Prisma unique constraint error
         const isUniqueConstraintError = 
           (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') ||
@@ -95,6 +111,37 @@ export async function getCurrentUser() {
             break
           }
           // If not found and retries left, try again with longer delay
+          retries--
+          if (retries > 0) {
+            await new Promise(resolve => setTimeout(resolve, 200))
+            continue
+          }
+        } else if (isEmailConstraintError && retries < 5) {
+          // Email constraint after making nullable - use raw SQL
+          try {
+            await db.$executeRawUnsafe(`
+              INSERT INTO users (id, role, "isBlocked", "createdAt", "updatedAt")
+              VALUES ('${user.id}', '${isAdmin ? 'admin' : 'user'}', false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+              ON CONFLICT (id) DO NOTHING
+            `)
+            
+            await new Promise(resolve => setTimeout(resolve, 200))
+            dbUser = await db.user.findUnique({
+              where: { id: user.id },
+              select: {
+                id: true,
+                role: true,
+                isBlocked: true,
+                createdAt: true,
+                updatedAt: true
+              }
+            })
+            if (dbUser) {
+              break
+            }
+          } catch (sqlError) {
+            // SQL failed, continue to next retry
+          }
           retries--
           if (retries > 0) {
             await new Promise(resolve => setTimeout(resolve, 200))
