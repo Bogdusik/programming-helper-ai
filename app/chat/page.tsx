@@ -34,6 +34,7 @@ function ChatPageContent() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [showPreAssessment, setShowPreAssessment] = useState(false)
   const [showResearchConsent, setShowResearchConsent] = useState(false)
+  const [profileModalDismissed, setProfileModalDismissed] = useState(false)
   const [assessmentQuestions, setAssessmentQuestions] = useState<AssessmentQuestion[]>([])
   const [taskInitialized, setTaskInitialized] = useState(false)
   
@@ -234,8 +235,8 @@ function ChatPageContent() {
     
     // Order: Profile → Pre-Assessment → Onboarding Tour (after consent)
     if (userProfile) {
-      // Step 1: Show profile modal if not completed
-      if (!userProfile.profileCompleted) {
+      // Step 1: Show profile modal if not completed AND not dismissed
+      if (!userProfile.profileCompleted && !profileModalDismissed) {
         setShowProfileModal(true)
         setShowOnboarding(false)
         setShowPreAssessment(false)
@@ -292,6 +293,8 @@ function ChatPageContent() {
     }
   }
 
+  const utils = trpc.useUtils()
+  
   const handleProfileComplete = async (data: ProfileData) => {
     try {
       await updateProfileMutation.mutateAsync({
@@ -303,8 +306,12 @@ function ChatPageContent() {
         primaryLanguage: data.primaryLanguage,
       })
       setShowProfileModal(false)
-      // Refetch profile to get updated data
+      setProfileModalDismissed(true)
+      
+      // Invalidate and refetch profile to get updated data
+      await utils.profile.getProfile.invalidate()
       await refetchProfile()
+      
       // Pre-assessment will be shown automatically via useEffect
     } catch (error) {
       console.error('Error updating profile:', error)
@@ -332,8 +339,6 @@ function ChatPageContent() {
     }
   }
 
-  const utils = trpc.useUtils()
-  
   const handleOnboardingComplete = async () => {
     setShowOnboarding(false)
     await updateOnboardingMutation.mutateAsync({
@@ -436,7 +441,10 @@ function ChatPageContent() {
         <Suspense fallback={null}>
           <UserProfileModal
             isOpen={showProfileModal}
-            onClose={() => setShowProfileModal(false)}
+            onClose={() => {
+        setShowProfileModal(false)
+        setProfileModalDismissed(true)
+      }}
             onComplete={handleProfileComplete}
             isOptional={userProfile?.profileCompleted || false}
             initialData={userProfile ? {
