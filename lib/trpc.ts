@@ -1868,12 +1868,35 @@ export const appRouter = router({
       .query(async ({ ctx }) => {
         const { user } = ctx
         
+        // Get full user data including profileCompleted
+        const fullUser = await db.user.findUnique({
+          where: { id: user.id },
+          select: {
+            id: true,
+            role: true,
+            isBlocked: true,
+            createdAt: true,
+            updatedAt: true,
+            selfReportedLevel: true,
+            assessedLevel: true,
+            learningGoals: true,
+            aiExperience: true,
+            initialConfidence: true,
+            preferredLanguages: true,
+            primaryLanguage: true,
+            onboardingCompleted: true,
+            onboardingStep: true,
+            showTooltips: true,
+            profileCompleted: true, // This is critical!
+          }
+        })
+        
         const profile = await db.userProfile.findUnique({
           where: { userId: user.id },
         })
 
         return {
-          ...user,
+          ...fullUser,
           profile,
         }
       }),
