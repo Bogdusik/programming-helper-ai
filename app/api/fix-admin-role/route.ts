@@ -39,15 +39,52 @@ export async function GET() {
         }
       })
     } catch (error: any) {
-      // If role column doesn't exist, we need to add it first
+      // If role column doesn't exist, try to add it automatically
       if (error?.message?.includes('role') || error?.message?.includes('does not exist')) {
-        return NextResponse.json({ 
-          error: 'Database schema is out of date. The role column does not exist.',
-          solution: 'Please run "npx prisma db push" on your database or wait for the next deployment to sync the schema.',
-          details: 'The database needs to be synced with the Prisma schema. This should happen automatically during deployment.'
-        }, { status: 500 })
+        logger.info('Role column missing, attempting to add it automatically', user.id)
+        
+        try {
+          // Try to add the column automatically
+          await db.$executeRaw`
+            ALTER TABLE users 
+            ADD COLUMN IF NOT EXISTS role VARCHAR(255) DEFAULT 'user'
+          `
+          
+          await db.$executeRaw`
+            UPDATE users 
+            SET role = 'user' 
+            WHERE role IS NULL
+          `
+          
+          await db.$executeRaw`
+            ALTER TABLE users 
+            ALTER COLUMN role SET NOT NULL
+          `
+          
+          logger.info('Role column added automatically', user.id)
+          
+          // Now try to fetch user again
+          dbUser = await db.user.findUnique({
+            where: { id: user.id },
+            select: {
+              id: true,
+              role: true,
+            }
+          })
+        } catch (migrationError: any) {
+          logger.error('Failed to add role column automatically', user.id, {
+            error: migrationError instanceof Error ? migrationError.message : 'Unknown error'
+          })
+          
+          return NextResponse.json({ 
+            error: 'Database schema is out of date. The role column does not exist.',
+            solution: 'Please call POST /api/migrate-schema first to add the role column, then try again.',
+            details: 'The database needs to be synced with the Prisma schema. You can either call /api/migrate-schema endpoint or run the SQL script manually.'
+          }, { status: 500 })
+        }
+      } else {
+        throw error
       }
-      throw error
     }
 
     if (!dbUser) {
