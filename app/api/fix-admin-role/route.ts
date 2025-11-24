@@ -28,22 +28,28 @@ export async function GET() {
       }, { status: 403 })
     }
 
-    // First, ensure all required columns exist
-    // Check and add missing columns one by one
-    const requiredColumns = [
+    // First, ensure ALL columns from schema exist
+    // This is critical - Prisma tries to select ALL columns, so ALL must exist
+    const allColumns = [
       { name: 'role', type: 'VARCHAR(255)', default: "'user'", notNull: true },
       { name: 'isBlocked', type: 'BOOLEAN', default: 'false', notNull: true },
+      { name: 'createdAt', type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP', notNull: true },
+      { name: 'updatedAt', type: 'TIMESTAMP', default: 'CURRENT_TIMESTAMP', notNull: true },
+      { name: 'selfReportedLevel', type: 'VARCHAR(255)', default: 'NULL', notNull: false },
+      { name: 'assessedLevel', type: 'VARCHAR(255)', default: 'NULL', notNull: false },
+      { name: 'learningGoals', type: 'TEXT[]', default: "'{}'", notNull: false },
+      { name: 'aiExperience', type: 'VARCHAR(255)', default: 'NULL', notNull: false },
+      { name: 'initialConfidence', type: 'INTEGER', default: 'NULL', notNull: false },
+      { name: 'preferredLanguages', type: 'TEXT[]', default: "'{}'", notNull: false },
+      { name: 'primaryLanguage', type: 'VARCHAR(255)', default: 'NULL', notNull: false },
       { name: 'onboardingCompleted', type: 'BOOLEAN', default: 'false', notNull: true },
       { name: 'onboardingStep', type: 'INTEGER', default: '0', notNull: true },
       { name: 'showTooltips', type: 'BOOLEAN', default: 'true', notNull: true },
       { name: 'profileCompleted', type: 'BOOLEAN', default: 'false', notNull: true },
-      { name: 'learningGoals', type: 'TEXT[]', default: "'{}'", notNull: false },
-      { name: 'preferredLanguages', type: 'TEXT[]', default: "'{}'", notNull: false },
     ]
 
-    for (const col of requiredColumns) {
+    for (const col of allColumns) {
       try {
-        // Check if column exists using parameterized query
         const result = await db.$queryRaw<Array<{ column_name: string }>>`
           SELECT column_name 
           FROM information_schema.columns 
@@ -53,28 +59,21 @@ export async function GET() {
         if (result.length === 0) {
           logger.info(`Adding missing column: ${col.name}`, user.id)
           
-          // Add column - use proper SQL escaping
-          const addColumnSQL = `ALTER TABLE users ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type} DEFAULT ${col.default}`
+          const addColumnSQL = `ALTER TABLE users ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type}${col.default !== 'NULL' ? ` DEFAULT ${col.default}` : ''}`
           await db.$executeRawUnsafe(addColumnSQL)
           
-          // Update existing rows with default value
-          if (col.notNull) {
-            const updateSQL = `UPDATE users SET "${col.name}" = ${col.default} WHERE "${col.name}" IS NULL`
-            await db.$executeRawUnsafe(updateSQL)
-            
-            // Make NOT NULL if required
-            const alterSQL = `ALTER TABLE users ALTER COLUMN "${col.name}" SET NOT NULL`
-            await db.$executeRawUnsafe(alterSQL)
+          if (col.notNull && col.default !== 'NULL') {
+            await db.$executeRawUnsafe(`UPDATE users SET "${col.name}" = ${col.default} WHERE "${col.name}" IS NULL`)
+            await db.$executeRawUnsafe(`ALTER TABLE users ALTER COLUMN "${col.name}" SET NOT NULL`)
           }
           
           logger.info(`Column ${col.name} added successfully`, user.id)
         }
       } catch (colError: any) {
         logger.error(`Failed to add column ${col.name}`, user.id, {
-          error: colError instanceof Error ? colError.message : 'Unknown error',
-          stack: colError instanceof Error ? colError.stack : undefined
+          error: colError instanceof Error ? colError.message : 'Unknown error'
         })
-        // Continue with other columns even if one fails
+        // Continue with other columns
       }
     }
 
