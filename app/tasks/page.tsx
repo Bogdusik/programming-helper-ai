@@ -7,10 +7,14 @@ import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { trpc } from '../../lib/trpc-client'
-import type { RouterOutputs } from '../../lib/trpc-types'
+import type { inferRouterOutputs } from '@trpc/server'
+import type { AppRouter } from '../../lib/trpc'
 
 import { useBlockedStatus } from '../../hooks/useBlockedStatus'
 import toast from 'react-hot-toast'
+
+// Infer router outputs to avoid deep type recursion
+type RouterOutputs = inferRouterOutputs<AppRouter>
 
 // Type for task with userProgress included (when includeProgress: true)
 type TaskWithProgress = RouterOutputs['task']['getTasks'][number] & {
