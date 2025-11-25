@@ -1688,7 +1688,10 @@ async function main() {
     const taskId = `task-${task.language}-${task.title.toLowerCase().replace(/\s/g, '-')}`
     await prisma.programmingTask.upsert({
       where: { id: taskId },
-      update: {},
+      update: {
+        // Update isActive to true to ensure tasks are visible
+        isActive: true,
+      },
       create: {
         id: taskId,
         title: task.title,
@@ -1699,6 +1702,7 @@ async function main() {
         starterCode: task.starterCode,
         hints: task.hints,
         solution: task.solution,
+        isActive: true, // Explicitly set isActive to true
       },
     })
   }
