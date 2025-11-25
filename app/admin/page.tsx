@@ -1141,7 +1141,18 @@ function TasksManagementModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
         ) : tasksData && tasksData.tasks.length > 0 ? (
           <>
             <div className="space-y-2 mb-4">
-              {(tasksData.tasks as unknown as AdminTask[]).map((task) => (
+              {(() => {
+                const tasks = tasksData.tasks as Array<{
+                  id: string
+                  title: string
+                  isActive: boolean
+                  description: string
+                  language: string
+                  difficulty: string
+                  category: string
+                  _count: { userProgress: number }
+                }>
+                return tasks.map((task) => (
                 <div key={task.id} className="bg-white/5 rounded-lg p-4 border border-white/10 hover:bg-white/10 transition-colors">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
@@ -1181,7 +1192,8 @@ function TasksManagementModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                     </div>
                   </div>
                 </div>
-              ))}
+                ))
+              })()}
             </div>
 
             {tasksData.pagination.totalPages > 1 && (
