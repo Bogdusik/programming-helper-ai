@@ -93,13 +93,16 @@ export default function TasksPage() {
     // Cast to TaskWithProgress[] since includeProgress: true
     const tasksWithProgress = allTasks as unknown as TaskWithProgress[]
     
-    // If only one language or no specific languages, just take first 5
+    // If only one language or no specific languages, show all tasks (up to reasonable limit)
+    // Changed from 5 to show more tasks for better user experience
     if (!languagesToFilter || languagesToFilter.length <= 1) {
-      return tasksWithProgress.slice(0, 5)
+      // Show up to 20 tasks if filtered by single language, or all if no filter
+      return tasksWithProgress.slice(0, 20)
     }
     
-    // If multiple languages, distribute tasks evenly, but ensure we get exactly 5 if available
-    const tasksPerLanguage = Math.ceil(5 / languagesToFilter.length)
+    // If multiple languages, distribute tasks evenly, but ensure we get enough tasks
+    const maxTasks = 20
+    const tasksPerLanguage = Math.ceil(maxTasks / languagesToFilter.length)
     const tasksByLanguage: { [key: string]: TaskWithProgress[] } = {}
     
     // Group tasks by language
@@ -116,14 +119,14 @@ export default function TasksPage() {
     for (const lang of languagesToFilter) {
       const langLower = lang.toLowerCase()
       const langTasks = tasksByLanguage[langLower] || []
-      const needed = 5 - result.length
+      const needed = maxTasks - result.length
       const toTake = Math.min(tasksPerLanguage, needed, langTasks.length)
       result.push(...langTasks.slice(0, toTake))
-      if (result.length >= 5) break
+      if (result.length >= maxTasks) break
     }
     
-    // If we still don't have 5 tasks, fill from remaining tasks regardless of language
-    if (result.length < 5 && tasksWithProgress) {
+    // If we still don't have enough tasks, fill from remaining tasks regardless of language
+    if (result.length < maxTasks && tasksWithProgress) {
       // Extract IDs as strings to avoid deep type recursion
       const usedTaskIds = new Set<string>(
         (result as Array<{ id: string }>).map((t) => t.id)
@@ -131,12 +134,13 @@ export default function TasksPage() {
       for (const task of tasksWithProgress) {
         if (!usedTaskIds.has(task.id)) {
           result.push(task)
-          if (result.length >= 5) break
+          if (result.length >= maxTasks) break
         }
       }
     }
     
-    return result.slice(0, 5)
+    // Return up to 20 tasks if multiple languages, or all if less
+    return result.slice(0, 20)
   }, [allTasks, languagesToFilter])
   
   const utils = trpc.useUtils()
