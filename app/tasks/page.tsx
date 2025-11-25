@@ -7,9 +7,20 @@ import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { trpc } from '../../lib/trpc-client'
-import type { Tasks, Task } from '../../lib/trpc-types'
+import type { RouterOutputs } from '../../lib/trpc-types'
+
 import { useBlockedStatus } from '../../hooks/useBlockedStatus'
 import toast from 'react-hot-toast'
+
+// Type for task with userProgress included (when includeProgress: true)
+type TaskWithProgress = RouterOutputs['task']['getTasks'][number] & {
+  userProgress?: Array<{
+    id: string
+    status: string
+    chatSessionId: string | null
+    attempts: number
+  }>
+}
 
 export default function TasksPage() {
   const { isSignedIn, isLoaded } = useUser()
@@ -50,17 +61,20 @@ export default function TasksPage() {
   const tasks = useMemo(() => {
     if (!allTasks || allTasks.length === 0) return []
     
+    // Cast to TaskWithProgress[] since includeProgress: true
+    const tasksWithProgress = allTasks as unknown as TaskWithProgress[]
+    
     // If only one language or no specific languages, just take first 5
     if (!languagesToFilter || languagesToFilter.length <= 1) {
-      return allTasks.slice(0, 5)
+      return tasksWithProgress.slice(0, 5)
     }
     
     // If multiple languages, distribute tasks evenly, but ensure we get exactly 5 if available
     const tasksPerLanguage = Math.ceil(5 / languagesToFilter.length)
-    const tasksByLanguage: { [key: string]: typeof allTasks } = {}
+    const tasksByLanguage: { [key: string]: TaskWithProgress[] } = {}
     
     // Group tasks by language
-    for (const task of allTasks) {
+    for (const task of tasksWithProgress) {
       const lang = task.language.toLowerCase()
       if (!tasksByLanguage[lang]) {
         tasksByLanguage[lang] = []
@@ -69,7 +83,7 @@ export default function TasksPage() {
     }
     
     // Take tasks from each language
-    const result: typeof allTasks = []
+    const result: TaskWithProgress[] = []
     for (const lang of languagesToFilter) {
       const langLower = lang.toLowerCase()
       const langTasks = tasksByLanguage[langLower] || []
@@ -80,9 +94,12 @@ export default function TasksPage() {
     }
     
     // If we still don't have 5 tasks, fill from remaining tasks regardless of language
-    if (result.length < 5 && allTasks) {
-      const usedTaskIds = new Set(result.map((t) => t.id))
-      for (const task of allTasks) {
+    if (result.length < 5 && tasksWithProgress) {
+      // Extract IDs as strings to avoid deep type recursion
+      const usedTaskIds = new Set<string>(
+        (result as Array<{ id: string }>).map((t) => t.id)
+      )
+      for (const task of tasksWithProgress) {
         if (!usedTaskIds.has(task.id)) {
           result.push(task)
           if (result.length >= 5) break
@@ -130,7 +147,7 @@ export default function TasksPage() {
     return null
   }
 
-  const handleStartTask = async (task: Task) => {
+  const handleStartTask = async (task: TaskWithProgress) => {
     // Prevent multiple clicks
     if (startingTaskId === task.id) {
       return
@@ -215,7 +232,7 @@ export default function TasksPage() {
     }
   }
 
-  const handleRestartTask = async (task: Task) => {
+  const handleRestartTask = async (task: TaskWithProgress) => {
     if (!confirm('Are you sure you want to restart this task? Your previous progress will be reset.')) {
       return
     }
@@ -237,16 +254,16 @@ export default function TasksPage() {
     }
   }
 
-  const getTaskStatus = (task: Task) => {
+  const getTaskStatus = (task: TaskWithProgress) => {
     const progress = task.userProgress?.[0]
     return progress?.status || 'not_started'
   }
 
-  const isTaskCompleted = (task: Task) => {
+  const isTaskCompleted = (task: TaskWithProgress) => {
     return getTaskStatus(task) === 'completed'
   }
 
-  const isTaskInProgress = (task: Task) => {
+  const isTaskInProgress = (task: TaskWithProgress) => {
     return getTaskStatus(task) === 'in_progress'
   }
 
