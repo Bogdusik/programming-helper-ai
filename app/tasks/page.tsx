@@ -41,14 +41,23 @@ export default function TasksPage() {
   })
   
   // Use preferred languages from profile, or fall back to selectedLanguage filter
+  // If user has preferred languages, use them; otherwise show all tasks
   const preferredLanguages = userProfile?.preferredLanguages || []
+  const primaryLanguage = userProfile?.primaryLanguage
+  
+  // If user has at least one preferred language, use those languages
+  // If user has only primaryLanguage but no preferredLanguages, use primaryLanguage
+  // Otherwise, if user manually selected a language, use that
+  // If nothing is selected, show all tasks (undefined = all)
   const languagesToFilter = preferredLanguages.length > 0 
     ? preferredLanguages 
-    : selectedLanguage 
-      ? [selectedLanguage] 
-      : undefined
+    : primaryLanguage
+      ? [primaryLanguage]
+      : selectedLanguage 
+        ? [selectedLanguage] 
+        : undefined // undefined means show all languages
   
-  const { data: allTasks, isLoading } = trpc.task.getTasks.useQuery(
+  const { data: allTasks, isLoading, error: tasksError } = trpc.task.getTasks.useQuery(
     {
       languages: languagesToFilter,
       difficulty: selectedDifficulty,
@@ -59,6 +68,22 @@ export default function TasksPage() {
       enabled: isSignedIn,
     }
   )
+  
+  // Debug: Log tasks data to help diagnose issues
+  useEffect(() => {
+    if (isSignedIn && !isLoading) {
+      console.log('Tasks query result:', {
+        allTasksCount: allTasks?.length || 0,
+        languagesToFilter: languagesToFilter || 'ALL (undefined)',
+        selectedDifficulty: selectedDifficulty || 'ALL',
+        preferredLanguages: preferredLanguages.length > 0 ? preferredLanguages : 'NONE',
+        primaryLanguage: primaryLanguage || 'NONE',
+        selectedLanguage: selectedLanguage || 'NONE',
+        hasError: !!tasksError,
+        errorMessage: tasksError?.message,
+      })
+    }
+  }, [allTasks, isLoading, isSignedIn, languagesToFilter, selectedDifficulty, preferredLanguages, primaryLanguage, selectedLanguage, tasksError])
   
   // Limit tasks to 5 maximum (as required for post-assessment unlock)
   // Distribute tasks across selected languages if multiple languages are selected
@@ -289,7 +314,7 @@ export default function TasksPage() {
 
           {/* Filters */}
           <div className="glass rounded-lg p-4 mb-8 flex flex-wrap gap-4 items-center justify-center max-w-2xl mx-auto">
-            {preferredLanguages.length === 0 && (
+            {(preferredLanguages.length === 0 && !primaryLanguage) && (
               <div>
                 <label className="text-sm text-white/70 mr-2">Language:</label>
                 <select
@@ -309,11 +334,11 @@ export default function TasksPage() {
                 </select>
               </div>
             )}
-            {preferredLanguages.length > 0 && (
+            {(preferredLanguages.length > 0 || primaryLanguage) && (
               <div className="text-sm text-white/70">
                 <span className="mr-2">Showing tasks for:</span>
                 <span className="text-white font-medium">
-                  {preferredLanguages.map(lang => {
+                  {languagesToFilter?.map(lang => {
                     const langNames: Record<string, string> = {
                       javascript: 'JavaScript',
                       typescript: 'TypeScript',
@@ -326,10 +351,12 @@ export default function TasksPage() {
                       sql: 'SQL',
                     }
                     return langNames[lang] || lang
-                  }).join(', ')}
+                  }).join(', ') || 'All Languages'}
                 </span>
                 <p className="text-xs text-white/50 mt-1">
-                  Update your language preferences on the Chat page to change this filter
+                  {preferredLanguages.length > 0 
+                    ? 'Update your language preferences on the Chat page to change this filter'
+                    : 'Update your primary language in your profile to change this filter'}
                 </p>
               </div>
             )}
@@ -349,7 +376,21 @@ export default function TasksPage() {
           </div>
 
           {/* Tasks Grid */}
-          {tasks && tasks.length > 0 ? (
+          {isLoading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center py-12">
+                <LoadingSpinner />
+                <p className="text-white/60 text-lg mt-4">Loading tasks...</p>
+              </div>
+            </div>
+          ) : tasksError ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center py-12">
+                <p className="text-red-400 text-lg mb-2">Error loading tasks</p>
+                <p className="text-white/60 text-sm">{tasksError.message}</p>
+              </div>
+            </div>
+          ) : tasks && tasks.length > 0 ? (
             <div className="flex justify-center items-center">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-5xl">
                 {tasks.map((task) => {
@@ -458,7 +499,31 @@ export default function TasksPage() {
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center py-12">
-                <p className="text-white/60 text-lg">No tasks available. Check back later!</p>
+                <p className="text-white/60 text-lg mb-2">No tasks available</p>
+                {!languagesToFilter || languagesToFilter.length === 0 ? (
+                  <p className="text-white/40 text-sm">
+                    Please select a language filter above or update your language preferences in your profile
+                  </p>
+                ) : (
+                  <p className="text-white/40 text-sm">
+                    {languagesToFilter.length > 0 
+                      ? `No tasks found for ${languagesToFilter.map(lang => {
+                          const langNames: Record<string, string> = {
+                            javascript: 'JavaScript',
+                            typescript: 'TypeScript',
+                            python: 'Python',
+                            java: 'Java',
+                            cpp: 'C++',
+                            csharp: 'C#',
+                            rust: 'Rust',
+                            go: 'Go',
+                            sql: 'SQL',
+                          }
+                          return langNames[lang] || lang
+                        }).join(', ')}. Try selecting a different language or difficulty filter.`
+                      : 'Try selecting a different language or difficulty filter.'}
+                  </p>
+                )}
               </div>
             </div>
           )}
