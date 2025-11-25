@@ -203,6 +203,29 @@ This application is designed with research ethics in mind. User data is handled 
 
 ---
 
+## 🗄️ Database Setup
+
+### Seeding Tasks
+
+To populate the database with programming tasks, run:
+
+```bash
+# Local development
+npm run db:seed
+
+# Production (with production DATABASE_URL)
+DATABASE_URL="your-production-database-url" npm run db:seed
+```
+
+Or use the API endpoint (creates critical tasks for Go and SQL):
+```bash
+POST /api/seed-tasks
+```
+
+**Note:** For full seed with all 114 tasks, you must run `npm run db:seed` with your production DATABASE_URL.
+
+---
+
 ## 🤝 Contributing
 
 This is a personal project showcasing modern web development practices. While contributions are welcome, please note that this application is designed for specific use cases and research purposes.
