@@ -3,6 +3,7 @@
 import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { Prisma } from '@prisma/client'
 import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -48,16 +49,47 @@ export default function StatsPage() {
         language: userProfile?.primaryLanguage || undefined,
       })
       // Transform database questions to AssessmentQuestion format
-      const transformedQuestions: AssessmentQuestion[] = questions.map((q: { id: string; question: string; type: string; options?: string[] | string | null; correctAnswer: string; category: string; difficulty: string; explanation?: string | null }) => ({
-        id: q.id,
-        question: q.question,
-        type: q.type as 'multiple_choice' | 'code_snippet' | 'conceptual',
-        options: Array.isArray(q.options) ? q.options : (q.options ? [q.options] : undefined),
-        correctAnswer: q.correctAnswer,
-        category: q.category,
-        difficulty: q.difficulty,
-        explanation: q.explanation || undefined,
-      }))
+      // Cast to type with Prisma.JsonValue for options and explanation
+      const questionsArray = questions as unknown as Array<{
+        id: string
+        question: string
+        type: string
+        options: Prisma.JsonValue
+        correctAnswer: string
+        category: string
+        difficulty: string
+        explanation: Prisma.JsonValue
+      }>
+      
+      const transformedQuestions: AssessmentQuestion[] = questionsArray.map((q) => {
+        // Convert options from Prisma.JsonValue to string[] | undefined
+        let options: string[] | undefined = undefined
+        if (q.options !== null && q.options !== undefined) {
+          if (Array.isArray(q.options)) {
+            // Filter out non-string values and convert to string[]
+            options = q.options.filter((item): item is string => typeof item === 'string')
+          } else if (typeof q.options === 'string') {
+            options = [q.options]
+          }
+        }
+        
+        // Convert explanation from Prisma.JsonValue to string | undefined
+        let explanation: string | undefined = undefined
+        if (q.explanation !== null && q.explanation !== undefined && typeof q.explanation === 'string') {
+          explanation = q.explanation
+        }
+        
+        return {
+          id: q.id,
+          question: q.question,
+          type: q.type as 'multiple_choice' | 'code_snippet' | 'conceptual',
+          options,
+          correctAnswer: q.correctAnswer,
+          category: q.category,
+          difficulty: q.difficulty,
+          explanation,
+        }
+      })
       setAssessmentQuestions(transformedQuestions)
       setShowPostAssessment(true)
     } catch (error) {
