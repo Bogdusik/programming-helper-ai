@@ -1593,6 +1593,94 @@ async function main() {
       hints: ['Use WHERE clause with comparison', 'Use subquery with AVG()'],
       solution: 'SELECT * FROM table_name WHERE column_name > (SELECT AVG(column_name) FROM table_name);',
     },
+    // Additional tasks for languages that need more coverage
+    // Rust - add 1 intermediate task
+    {
+      title: 'Check Palindrome',
+      description: 'Write a function that checks if a string is a palindrome.',
+      language: 'rust',
+      difficulty: 'intermediate',
+      category: 'algorithms',
+      starterCode: 'fn is_palindrome(s: &str) -> bool {\n    // Your code here\n    false\n}',
+      hints: ['Remove spaces and convert to lowercase', 'Compare the string with its reverse'],
+      solution: 'fn is_palindrome(s: &str) -> bool {\n    let cleaned: String = s.to_lowercase().chars().filter(|c| !c.is_whitespace()).collect();\n    cleaned == cleaned.chars().rev().collect::<String>()\n}',
+    },
+    // Go - add 1 intermediate task
+    {
+      title: 'Check Palindrome',
+      description: 'Write a function that checks if a string is a palindrome.',
+      language: 'go',
+      difficulty: 'intermediate',
+      category: 'algorithms',
+      starterCode: 'func isPalindrome(s string) bool {\n    // Your code here\n    return false\n}',
+      hints: ['Remove spaces and convert to lowercase', 'Compare characters from both ends'],
+      solution: 'func isPalindrome(s string) bool {\n    cleaned := strings.ToLower(strings.ReplaceAll(s, " ", ""))\n    runes := []rune(cleaned)\n    for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {\n        if runes[i] != runes[j] {\n            return false\n        }\n    }\n    return true\n}',
+    },
+    // Swift - add 1 beginner task (Sum of Array)
+    {
+      title: 'Sum of Array',
+      description: 'Write a function that calculates and returns the sum of all numbers in an array.',
+      language: 'swift',
+      difficulty: 'beginner',
+      category: 'algorithms',
+      starterCode: 'func sumArray(_ arr: [Int]) -> Int {\n    // Your code here\n    return 0\n}',
+      hints: ['Use reduce method', 'Or iterate through the array', 'Add each element to a running total'],
+      solution: 'func sumArray(_ arr: [Int]) -> Int {\n    return arr.reduce(0, +)\n}',
+    },
+    // Kotlin - add 1 beginner task (Sum of Array)
+    {
+      title: 'Sum of Array',
+      description: 'Write a function that calculates and returns the sum of all numbers in an array.',
+      language: 'kotlin',
+      difficulty: 'beginner',
+      category: 'algorithms',
+      starterCode: 'fun sumArray(arr: IntArray): Int {\n    // Your code here\n    return 0\n}',
+      hints: ['Use sum() method', 'Or iterate through the array', 'Add each element to a running total'],
+      solution: 'fun sumArray(arr: IntArray): Int {\n    return arr.sum()\n}',
+    },
+    // Dart - add 1 beginner task (Sum of List)
+    {
+      title: 'Sum of List',
+      description: 'Write a function that calculates and returns the sum of all numbers in a list.',
+      language: 'dart',
+      difficulty: 'beginner',
+      category: 'algorithms',
+      starterCode: 'int sumList(List<int> arr) {\n    // Your code here\n    return 0;\n}',
+      hints: ['Use fold method', 'Or iterate through the list', 'Add each element to a running total'],
+      solution: 'int sumList(List<int> arr) {\n    return arr.fold(0, (a, b) => a + b);\n}',
+    },
+    // Scala - add 1 beginner task (Sum of Array)
+    {
+      title: 'Sum of Array',
+      description: 'Write a function that calculates and returns the sum of all numbers in an array.',
+      language: 'scala',
+      difficulty: 'beginner',
+      category: 'algorithms',
+      starterCode: 'def sumArray(arr: Array[Int]): Int = {\n    // Your code here\n    0\n}',
+      hints: ['Use sum method', 'Or use foldLeft', 'Add each element to a running total'],
+      solution: 'def sumArray(arr: Array[Int]): Int = {\n    arr.sum\n}',
+    },
+    // R - add 1 beginner and 1 intermediate task
+    {
+      title: 'Count Vowels in String',
+      description: 'Write a function that counts the number of vowels (a, e, i, o, u) in a given string.',
+      language: 'r',
+      difficulty: 'beginner',
+      category: 'algorithms',
+      starterCode: 'count_vowels <- function(str) {\n    # Your code here\n    0\n}',
+      hints: ['Convert string to lowercase', 'Use strsplit and count vowels'],
+      solution: 'count_vowels <- function(str) {\n    vowels <- c("a", "e", "i", "o", "u")\n    chars <- strsplit(tolower(str), "")[[1]]\n    sum(chars %in% vowels)\n}',
+    },
+    {
+      title: 'Two Sum',
+      description: 'Given a vector of integers and a target sum, find two numbers that add up to the target.',
+      language: 'r',
+      difficulty: 'intermediate',
+      category: 'algorithms',
+      starterCode: 'two_sum <- function(nums, target) {\n    # Your code here\n    c()\n}',
+      hints: ['Use a list to store seen numbers', 'For each number, check if complement exists'],
+      solution: 'two_sum <- function(nums, target) {\n    seen <- list()\n    for (i in seq_along(nums)) {\n        complement <- target - nums[i]\n        if (!is.null(seen[[as.character(complement)]])) {\n            return(c(seen[[as.character(complement)]], i))\n        }\n        seen[[as.character(nums[i])]] <- i\n    }\n    c()\n}',
+    },
   ]
 
   for (const task of programmingTasks) {
