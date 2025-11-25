@@ -229,7 +229,11 @@ export default function TasksPage() {
   const handleCompleteTask = async (taskId: string) => {
     try {
       await completeTaskMutation.mutateAsync({ taskId })
-      // Query will be invalidated automatically by the mutation's onSuccess
+      // Invalidate queries to refresh UI in Tasks page and Stats
+      await utils.task.getTasks.invalidate()
+      await utils.task.getTaskProgress.invalidate()
+      await utils.stats.getUserStats.invalidate()
+      toast.success('Task marked as completed! 🎉')
     } catch (error) {
       console.error('Error completing task:', error)
       toast.error('Error completing task. Please try again.')

@@ -18,8 +18,11 @@ export default function StatsPage() {
   const [assessmentQuestions, setAssessmentQuestions] = useState<AssessmentQuestion[]>([])
   
   // OPTIMIZATION: Add staleTime to cache data and improve navigation speed
-  const { data: stats, isLoading: statsLoading, error: statsError } = trpc.stats.getUserStats.useQuery(undefined, {
+  // But refetch on window focus to ensure stats are updated after completing tasks
+  const { data: stats, isLoading: statsLoading, error: statsError, refetch: refetchStats } = trpc.stats.getUserStats.useQuery(undefined, {
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes
+    refetchOnWindowFocus: true, // Refetch when user returns to the page
+    refetchOnMount: true, // Always refetch when component mounts to get latest stats
   })
   const { data: userProfile } = trpc.profile.getProfile.useQuery(undefined, {
     enabled: isSignedIn,

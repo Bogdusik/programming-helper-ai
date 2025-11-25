@@ -120,6 +120,16 @@ function ChatPageContent() {
 
   // Auto-send task description when task is loaded (only for new task starts)
   useEffect(() => {
+    // Skip if already initialized or still loading messages
+    if (taskInitialized || isLoadingMessages) {
+      return
+    }
+
+    // Only proceed if messages are loaded (not undefined)
+    if (existingMessages === undefined) {
+      return
+    }
+
     // Only send initial message if:
     // 1. Task data is loaded
     // 2. Session exists and messages are loaded (not loading)
@@ -127,15 +137,18 @@ function ChatPageContent() {
     // 4. User is signed in
     // 5. Both taskId and sessionId are in URL (indicating new task start)
     // 6. Session has no existing messages (it's a new session)
-    const hasNoMessages = !existingMessages || existingMessages.length === 0
+    const hasNoMessages = existingMessages.length === 0
     const isNewTaskStart = taskId && sessionIdFromUrl && hasNoMessages
     const isSessionReady = currentSessionId && !isLoadingMessages
     
     if (taskData && isSessionReady && !taskInitialized && isSignedIn && isNewTaskStart) {
+      // Mark as initialized immediately to prevent duplicate sends
+      setTaskInitialized(true)
+      
       // Add a small delay to ensure everything is fully loaded and rendered
       const timer = setTimeout(() => {
         // Double-check that messages are still empty (session wasn't populated in the meantime)
-        if (!existingMessages || existingMessages.length === 0) {
+        if (existingMessages.length === 0) {
           // Only send message if this is a new task start (both taskId and sessionId in URL, and no messages)
           const taskMessage = `I want to work on this task:\n\n**${taskData.title}**\n\n${taskData.description}\n\nLanguage: ${taskData.language}\nDifficulty: ${taskData.difficulty}\n\nPlease help me solve this task.`
           
@@ -144,7 +157,6 @@ function ChatPageContent() {
             message: taskMessage,
             sessionId: currentSessionId,
           }).then((result) => {
-            setTaskInitialized(true)
             // If a new session was created (session was missing), update currentSessionId
             if (result.sessionId && result.sessionId !== currentSessionId) {
               setCurrentSessionId(result.sessionId)
@@ -162,18 +174,22 @@ function ChatPageContent() {
             router.replace(newUrl.pathname + newUrl.search)
           }).catch((error) => {
             console.error('Error sending task message:', error)
-            setTaskInitialized(true)
+            // Reset initialization state on error so user can retry
+            setTaskInitialized(false)
           })
+        } else {
+          // Messages appeared in the meantime, mark as initialized
+          setTaskInitialized(true)
         }
-      }, 500) // Wait 500ms for session to be fully ready and rendered
+      }, 300) // Wait 300ms for session to be fully ready and rendered
       
       return () => clearTimeout(timer)
-    } else if (taskId && !taskInitialized && !isLoadingMessages) {
-      // If taskId exists but conditions not met, mark as initialized to prevent retries
-      // Only mark as initialized if messages are loaded (not loading)
+    } else if (taskId && !taskInitialized && !isLoadingMessages && existingMessages !== undefined) {
+      // If taskId exists but conditions not met (e.g., session has messages already), mark as initialized
+      // Only mark as initialized if messages are loaded (not loading) and we've checked them
       setTaskInitialized(true)
     }
-  }, [taskData?.id, currentSessionId, taskInitialized, isSignedIn, taskId, sessionIdFromUrl, existingMessages?.length, isLoadingMessages])
+  }, [taskData?.id, currentSessionId, taskInitialized, isSignedIn, taskId, sessionIdFromUrl, existingMessages, isLoadingMessages, sendMessageMutation, updateProgressMutation, router])
 
   // Separate useEffect specifically for Research Consent - highest priority
   // This runs independently to ensure it shows immediately for new users

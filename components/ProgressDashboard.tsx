@@ -13,7 +13,10 @@ export default function ProgressDashboard() {
   const [assessmentQuestions, setAssessmentQuestions] = useState<AssessmentQuestion[]>([])
   
   const { data: userProfile, isLoading: profileLoading } = trpc.profile.getProfile.useQuery()
-  const { data: stats, isLoading: statsLoading } = trpc.stats.getUserStats.useQuery()
+  const { data: stats, isLoading: statsLoading } = trpc.stats.getUserStats.useQuery(undefined, {
+    refetchOnWindowFocus: true, // Refetch when user returns to the page
+    refetchOnMount: true, // Always refetch when component mounts to get latest stats
+  })
   const { data: languageProgress, isLoading: languageProgressLoading } = trpc.profile.getLanguageProgress.useQuery()
   const { data: eligibility, isLoading: eligibilityLoading } = trpc.assessment.checkPostAssessmentEligibility.useQuery()
   const { data: assessments, isLoading: assessmentsLoading } = trpc.assessment.getAssessments.useQuery()
