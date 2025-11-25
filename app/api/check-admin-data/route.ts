@@ -21,11 +21,47 @@ export async function GET() {
         email?: string
         role?: string
       }
-      database?: {
-        users?: number
-        messages?: number
+      database: {
+        user?: {
+          id?: string
+          role?: string
+          isBlocked?: boolean
+          error?: string
+        }
+        users?: {
+          total?: number
+          active?: number
+          blocked?: number
+          error?: string
+        }
+        messages?: {
+          total?: number
+          userMessages?: number
+          error?: string
+        }
         sessions?: number
-        stats?: number
+        chatSessions?: {
+          total?: number
+          userSessions?: number
+          error?: string
+        }
+        stats?: {
+          totalRecords?: number
+          userStats?: {
+            questionsAsked: number
+            tasksCompleted: number
+            totalTimeSpent: number
+          } | null
+          error?: string
+        }
+        dashboardStats?: {
+          totalUsers?: number
+          totalMessages?: number
+          totalSessions?: number
+          avgResponseTime?: number
+          success?: boolean
+          error?: string
+        }
       }
       errors?: string[]
     } = {
@@ -47,7 +83,7 @@ export async function GET() {
           isBlocked: true
         }
       })
-      results.database.user = dbUser
+      results.database.user = dbUser || undefined
     } catch (error) {
       results.database.user = { error: error instanceof Error ? error.message : 'Unknown' }
     }
@@ -94,6 +130,7 @@ export async function GET() {
         total: sessionsCount,
         userSessions: userSessionsCount
       }
+      results.database.sessions = sessionsCount
     } catch (error) {
       results.database.chatSessions = { error: error instanceof Error ? error.message : 'Unknown' }
     }
