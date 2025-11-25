@@ -8,7 +8,7 @@ import type { inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from './trpc'
 
 // Infer all router outputs
-type RouterOutputs = inferRouterOutputs<AppRouter>
+export type RouterOutputs = inferRouterOutputs<AppRouter>
 
 // Task-related types
 export type TaskProgress = RouterOutputs['task']['getTaskProgress'][number]
