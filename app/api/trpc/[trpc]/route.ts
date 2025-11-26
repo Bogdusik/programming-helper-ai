@@ -1,6 +1,19 @@
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch'
 import { appRouter } from '@/lib/trpc'
 import { logger } from '@/lib/logger'
+import { initializeRateLimitTable } from '@/lib/rate-limit-db'
+
+// Initialize rate limits table on first import (only runs once due to module caching)
+let rateLimitInitialized = false
+if (!rateLimitInitialized) {
+  rateLimitInitialized = true
+  // Initialize asynchronously to avoid blocking requests
+  initializeRateLimitTable().catch((error) => {
+    logger.error('Failed to initialize rate limits table', undefined, {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    })
+  })
+}
 
 const handler = async (req: Request) => {
   try {

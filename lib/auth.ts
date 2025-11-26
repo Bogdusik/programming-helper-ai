@@ -87,6 +87,8 @@ export async function getCurrentUser() {
         
         if (isEmailConstraintError && retries === 5) {
           // First attempt failed due to email, make email nullable and retry
+          // Note: ALTER TABLE doesn't support parameters, but this is safe as it's a static command
+          // and only runs if email column exists (which is checked by error message)
           try {
             await db.$executeRawUnsafe(`ALTER TABLE users ALTER COLUMN email DROP NOT NULL`)
           } catch (alterError) {
@@ -129,13 +131,14 @@ export async function getCurrentUser() {
             continue
           }
         } else if (isEmailConstraintError && retries < 5) {
-          // Email constraint after making nullable - use raw SQL
+          // Email constraint after making nullable - use parameterized SQL to prevent injection
           try {
-            await db.$executeRawUnsafe(`
+            // Use Prisma.$executeRaw with Prisma.sql for safe parameterized queries
+            await db.$executeRaw`
               INSERT INTO users (id, role, "isBlocked", "createdAt", "updatedAt")
-              VALUES ('${user.id}', '${isAdmin ? 'admin' : 'user'}', false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+              VALUES (${user.id}, ${isAdmin ? 'admin' : 'user'}, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
               ON CONFLICT (id) DO NOTHING
-            `)
+            `
             
             await new Promise(resolve => setTimeout(resolve, 200))
             dbUser = await db.user.findUnique({

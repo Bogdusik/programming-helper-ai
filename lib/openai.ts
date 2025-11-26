@@ -134,9 +134,27 @@ The goal is LEARNING, not just completing the task. Help them understand the con
     return completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response."
   } catch (error) {
     logger.error('OpenAI API error', undefined, {
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
     })
-    throw new Error('Failed to generate response')
+    
+    // Provide more detailed error messages to users
+    if (error instanceof Error) {
+      if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
+        throw new Error('The AI service is taking too long to respond. Please try again in a moment.')
+      }
+      if (error.message.includes('rate limit') || error.message.includes('429')) {
+        throw new Error('AI service is currently busy. Please try again in a few moments.')
+      }
+      if (error.message.includes('quota') || error.message.includes('billing')) {
+        throw new Error('AI service quota exceeded. Please contact support.')
+      }
+      if (error.message.includes('invalid') || error.message.includes('400')) {
+        throw new Error('Invalid request to AI service. Please try rephrasing your question.')
+      }
+    }
+    
+    throw new Error('Failed to generate response. Please try again or contact support if the problem persists.')
   }
 }
 

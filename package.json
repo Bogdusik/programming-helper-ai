@@ -18,6 +18,7 @@
     "db:push:force": "prisma db push --accept-data-loss",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:init-rate-limits": "tsx scripts/init-rate-limits.ts",
     "db:studio": "prisma studio",
     "db:start": "brew services start postgresql@14",
     "db:stop": "brew services stop postgresql@14",

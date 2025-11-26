@@ -5,7 +5,7 @@ import { db } from './db'
 import { getCurrentUser } from './auth'
 import { generateResponse, generateChatTitle, analyzeQuestionType, checkAssessmentAnswer } from './openai'
 import { detectLanguage } from './prompts'
-import { rateLimit } from './rate-limit'
+import { rateLimit } from './rate-limit-db'
 import { logger } from './logger'
 import { trackUserAction } from './analytics'
 import { checkPostAssessmentEligibility } from './assessment-utils'
@@ -19,18 +19,45 @@ export const publicProcedure = t.procedure
 /**
  * Protected procedure that requires authentication
  * Ensures user is authenticated before proceeding
+ * Includes timeout protection for long-running operations
  */
 const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
   const user = await getCurrentUser()
   if (!user) {
     throw new TRPCError({ code: 'UNAUTHORIZED' })
   }
-  return next({
-    ctx: {
-      ...ctx,
-      user,
-    },
+  
+  // Add timeout protection (30 seconds for most operations)
+  const timeoutMs = 30000
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      reject(new TRPCError({
+        code: 'TIMEOUT',
+        message: 'Operation timed out. Please try again.',
+      }))
+    }, timeoutMs)
   })
+  
+  try {
+    const result = await Promise.race([
+      next({
+        ctx: {
+          ...ctx,
+          user,
+        },
+      }),
+      timeoutPromise,
+    ])
+    return result
+  } catch (error) {
+    if (error instanceof TRPCError && error.code === 'TIMEOUT') {
+      logger.error('tRPC operation timed out', user.id, {
+        timeoutMs,
+        path: ctx.path,
+      })
+    }
+    throw error
+  }
 })
 
 /**
@@ -218,14 +245,25 @@ export const appRouter = router({
         const { message, sessionId } = input
         const { user } = ctx
 
-        // Check if user has completed onboarding (profile and pre-assessment)
-        // This prevents users from sending messages before completing required steps
-        const userProfileCheck = await db.user.findUnique({
-          where: { id: user.id },
-          select: {
-            profileCompleted: true,
-          },
-        })
+        // OPTIMIZATION: Check onboarding status in parallel with rate limiting
+        // This reduces database queries and improves response time
+        const [userProfileCheck, preAssessment] = await Promise.all([
+          db.user.findUnique({
+            where: { id: user.id },
+            select: {
+              profileCompleted: true,
+            },
+          }),
+          db.assessment.findFirst({
+            where: {
+              userId: user.id,
+              type: 'pre',
+            },
+            select: {
+              id: true, // Only select id to minimize data transfer
+            },
+          }),
+        ])
 
         if (!userProfileCheck?.profileCompleted) {
           logger.warn('User attempted to send message before completing profile', user.id)
@@ -234,14 +272,6 @@ export const appRouter = router({
             message: 'Please complete your profile and assessment before sending messages. Please refresh the page to continue with onboarding.',
           })
         }
-
-        // Check if user has completed pre-assessment
-        const preAssessment = await db.assessment.findFirst({
-          where: {
-            userId: user.id,
-            type: 'pre',
-          },
-        })
 
         if (!preAssessment) {
           logger.warn('User attempted to send message before completing pre-assessment', user.id)
@@ -252,7 +282,7 @@ export const appRouter = router({
         }
 
         // Rate limiting: 10 requests per minute per user
-        const rateLimitResult = rateLimit(user.id, 10, 60000)
+        const rateLimitResult = await rateLimit(user.id, 10, 60000)
         if (!rateLimitResult.success) {
           logger.warn('Rate limit exceeded', user.id, { 
             remaining: rateLimitResult.remaining,
@@ -2816,7 +2846,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         // Rate limiting: 20 requests per hour per email
-        const rateLimitResult = rateLimit(input.email, 20, 3600000) // 20 per hour
+        const rateLimitResult = await rateLimit(input.email, 20, 3600000) // 20 per hour
         
         if (!rateLimitResult.success) {
           logger.warn('Contact form rate limit exceeded', undefined, {

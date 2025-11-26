@@ -126,11 +126,12 @@ export async function GET() {
           // If Prisma fails due to email constraint, use raw SQL
           if (createError instanceof Error && createError.message.includes('email')) {
             logger.info('Creating user with raw SQL due to email constraint', user.id)
-            await db.$executeRawUnsafe(`
+            // Use parameterized query to prevent SQL injection
+            await db.$executeRaw`
               INSERT INTO users (id, role, "isBlocked", "createdAt", "updatedAt")
-              VALUES ('${user.id}', '${isAdmin ? 'admin' : 'user'}', false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+              VALUES (${user.id}, ${isAdmin ? 'admin' : 'user'}, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
               ON CONFLICT (id) DO NOTHING
-            `)
+            `
             
             // Fetch the created user
             await new Promise(resolve => setTimeout(resolve, 200))
