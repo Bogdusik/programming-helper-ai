@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -420,8 +420,8 @@ async function main() {
       create: {
         id: questionId,
         question: question.question,
-        type: question.type as any,
-        options: question.options ? question.options as any : null,
+        type: question.type,
+        options: question.options ? (question.options as Prisma.InputJsonValue) : Prisma.JsonNull,
         correctAnswer: question.correctAnswer,
         category: question.category,
         difficulty: question.difficulty,

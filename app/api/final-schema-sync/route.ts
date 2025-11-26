@@ -359,6 +359,21 @@ export async function POST() {
           `CREATE INDEX IF NOT EXISTS "contact_messages_status_createdAt_idx" ON "contact_messages"("status", "createdAt")`
         ],
         foreignKeys: []
+      },
+      {
+        name: 'rate_limits',
+        sql: `CREATE TABLE IF NOT EXISTS "rate_limits" (
+          "identifier" TEXT NOT NULL,
+          "count" INTEGER NOT NULL DEFAULT 1,
+          "reset_time" TIMESTAMP(3) NOT NULL,
+          "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "rate_limits_pkey" PRIMARY KEY ("identifier")
+        )`,
+        indexes: [
+          `CREATE INDEX IF NOT EXISTS "idx_rate_limits_reset_time" ON "rate_limits"("reset_time")`
+        ],
+        foreignKeys: []
       }
     ]
     
