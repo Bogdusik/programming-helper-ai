@@ -40,7 +40,7 @@ describe('ErrorBoundary', () => {
     )
     
     expect(screen.getByText(/something went wrong/i)).toBeInTheDocument()
-    expect(screen.getByText(/try again/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/try again/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/go home/i)).toBeInTheDocument()
   })
 

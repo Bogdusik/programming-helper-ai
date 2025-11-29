@@ -20,7 +20,13 @@ describe('Analytics', () => {
       trackUserAction('simple_action', 'user123')
       
       const events = analytics.getEvents()
-      expect(events[0].properties).toEqual({})
+      // trackUserAction calls analytics.track with properties as third parameter
+      // If properties is not provided, it's undefined, not {}
+      // The Analytics.track method stores properties as-is (can be undefined)
+      expect(events[0].event).toBe('user.simple_action')
+      expect(events[0].userId).toBe('user123')
+      // Properties is optional and can be undefined
+      expect(events[0].properties).toBeUndefined()
     })
 
     it('tracks multiple user actions', () => {

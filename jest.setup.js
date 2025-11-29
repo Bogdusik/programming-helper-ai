@@ -18,7 +18,7 @@ jest.mock('next/navigation', () => ({
   },
 }))
 
-// Mock Clerk
+// Mock Clerk (client)
 jest.mock('@clerk/nextjs', () => ({
   useUser: () => ({
     isSignedIn: true,
@@ -28,6 +28,12 @@ jest.mock('@clerk/nextjs', () => ({
   UserButton: () => <div>UserButton</div>,
   SignInButton: ({ children }) => <div>{children}</div>,
   ClerkProvider: ({ children }) => <div>{children}</div>,
+}))
+
+// Mock Clerk (server)
+jest.mock('@clerk/nextjs/server', () => ({
+  currentUser: jest.fn(),
+  auth: jest.fn(),
 }))
 
 // Mock tRPC

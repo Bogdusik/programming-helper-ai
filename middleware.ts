@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
+// Routes that require authentication
 const isProtectedRoute = createRouteMatcher([
   '/chat(.*)',
   '/stats(.*)',
@@ -9,6 +10,7 @@ const isProtectedRoute = createRouteMatcher([
   '/tasks(.*)'
 ])
 
+// Routes that are accessible even when blocked (they handle their own auth)
 const isBlockedAllowedRoute = createRouteMatcher([
   '/blocked(.*)',
   '/contact(.*)',
@@ -16,6 +18,7 @@ const isBlockedAllowedRoute = createRouteMatcher([
   '/terms(.*)'
 ])
 
+// Public API routes that don't require authentication
 const isPublicApiRoute = createRouteMatcher([
   '/api/trpc/stats.getGlobalStats(.*)'
 ])

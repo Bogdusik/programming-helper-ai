@@ -58,6 +58,24 @@ export const createMockTrpc = () => ({
         refetch: jest.fn(),
       })),
     },
+    deleteSession: {
+      useMutation: jest.fn(() => ({
+        mutateAsync: jest.fn(),
+        mutate: jest.fn(),
+        isPending: false,
+        error: null,
+        data: undefined,
+      })),
+    },
+    updateSessionTitle: {
+      useMutation: jest.fn(() => ({
+        mutateAsync: jest.fn(),
+        mutate: jest.fn(),
+        isPending: false,
+        error: null,
+        data: undefined,
+      })),
+    },
   },
   profile: {
     getProfile: {
@@ -69,6 +87,41 @@ export const createMockTrpc = () => ({
       })),
     },
   },
+  assessment: {
+    getAssessments: {
+      useQuery: jest.fn(() => ({
+        data: [],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      })),
+    },
+  },
+  task: {
+    getTask: {
+      useQuery: jest.fn(() => ({
+        data: null,
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      })),
+    },
+    getTaskProgress: {
+      useQuery: jest.fn(() => ({
+        data: [],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      })),
+    },
+  },
+  useUtils: jest.fn(() => ({
+    task: {
+      getTaskProgress: {
+        invalidate: jest.fn(),
+      },
+    },
+  })),
 })
 
 // Helper to suppress console errors in tests
