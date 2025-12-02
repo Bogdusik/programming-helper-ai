@@ -242,12 +242,12 @@ function TaskPageContent() {
     (taskDataTyped.starterCode ? `**Starter Code:**\n\`\`\`${taskDataTyped.language}\n${taskDataTyped.starterCode}\n\`\`\`` : '')
   
   return (
-    <div className="min-h-screen gradient-bg">
+    <div className="min-h-screen gradient-bg flex flex-col">
       <Navbar />
       <MinimalBackground />
       
-      <div className="container mx-auto px-4 py-6 max-w-7xl pb-24">
-        <div className="mb-4 flex items-center justify-between flex-wrap gap-4">
+      <div className="container mx-auto px-4 py-4 sm:py-6 max-w-7xl flex-1 flex flex-col min-h-0">
+        <div className="mb-4 flex items-center justify-between flex-wrap gap-4 flex-shrink-0">
           <button
             onClick={() => router.push('/tasks')}
             className="text-white/70 hover:text-white flex items-center space-x-2 transition-colors"
@@ -271,7 +271,7 @@ function TaskPageContent() {
           </div>
         </div>
         
-        <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-4 sm:p-6 mb-4">
+        <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-4 sm:p-6 mb-4 flex-1 flex flex-col min-h-0">
           <CodeEditor
             question={questionText}
             value={code}
@@ -279,11 +279,11 @@ function TaskPageContent() {
             placeholder={`Write your solution in ${taskDataTyped.language}...`}
             language={taskDataTyped.language}
             isCode={true}
-            height="calc(100vh - 320px)"
+            height="100%"
           />
         </div>
         
-        <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-4 sm:p-6 mb-6">
+        <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-4 sm:p-6 mb-4 flex-shrink-0">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <button
               onClick={handleContinueInChat}
