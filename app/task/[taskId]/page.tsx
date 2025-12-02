@@ -246,8 +246,8 @@ function TaskPageContent() {
       <Navbar />
       <MinimalBackground />
       
-      <div className="container mx-auto px-4 py-2 sm:py-3 max-w-7xl flex flex-col">
-        <div className="mb-2 flex items-center justify-between flex-wrap gap-2 flex-shrink-0">
+      <div className="container mx-auto px-4 max-w-7xl flex-1 flex flex-col">
+        <div className="mb-4 flex items-center justify-between flex-wrap gap-2 flex-shrink-0 pt-4">
           <button
             onClick={() => router.push('/tasks')}
             className="text-white/70 hover:text-white flex items-center space-x-2 transition-colors"
@@ -271,19 +271,20 @@ function TaskPageContent() {
           </div>
         </div>
         
-        <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-1.5 sm:p-2 mb-2 flex flex-col overflow-hidden" style={{ height: '500px', maxHeight: '500px' }}>
-          <CodeEditor
-            question={questionText}
-            value={code}
-            onChange={setCode}
-            placeholder={`Write your solution in ${taskDataTyped.language}...`}
-            language={taskDataTyped.language}
-            isCode={true}
-            height="100%"
-          />
-        </div>
-        
-        <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-2 sm:p-3 mb-2 flex-shrink-0">
+        <div className="flex-1 flex flex-col justify-center">
+          <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-1.5 sm:p-2 mb-4 flex flex-col overflow-hidden" style={{ height: '500px', maxHeight: '500px' }}>
+            <CodeEditor
+              question={questionText}
+              value={code}
+              onChange={setCode}
+              placeholder={`Write your solution in ${taskDataTyped.language}...`}
+              language={taskDataTyped.language}
+              isCode={true}
+              height="100%"
+            />
+          </div>
+          
+          <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-2 sm:p-3 flex-shrink-0">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <button
               onClick={handleContinueInChat}
