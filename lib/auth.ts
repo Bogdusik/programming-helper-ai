@@ -1,6 +1,5 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { TRPCError } from '@trpc/server'
-import { Prisma } from '@prisma/client'
 import { db } from './db'
 
 /**

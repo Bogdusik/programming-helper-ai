@@ -2,7 +2,7 @@
 
 import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, Suspense } from 'react'
 import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -27,7 +27,8 @@ type TaskWithProgress = RouterOutputs['task']['getTasks'][number] & {
   }>
 }
 
-export default function TasksPage() {
+// Internal component that uses useSearchParams - must be wrapped in Suspense
+function TasksPageContent() {
   const { isSignedIn, isLoaded } = useUser()
   const router = useRouter()
   const { isBlocked, isLoading: isCheckingBlocked } = useBlockedStatus({
@@ -521,6 +522,15 @@ export default function TasksPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Main component that wraps TasksPageContent in Suspense
+export default function TasksPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <TasksPageContent />
+    </Suspense>
   )
 }
 
