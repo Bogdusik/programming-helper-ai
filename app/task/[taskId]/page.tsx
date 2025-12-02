@@ -38,12 +38,14 @@ function TaskPageContent() {
   
   // Initialize code with starter code if available
   useEffect(() => {
+    if (!taskData) return
     // Use type assertion to avoid deep type recursion
     const starterCode = (taskData as { starterCode?: string | null })?.starterCode
     if (starterCode && !code) {
       setCode(starterCode)
     }
-  }, [taskData, code])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskData?.id, code])
   
   const handleSubmitCode = async () => {
     if (!taskData || !code.trim() || isSubmitting) return
