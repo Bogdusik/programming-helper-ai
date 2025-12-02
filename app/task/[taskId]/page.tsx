@@ -112,6 +112,10 @@ function TaskPageContent() {
       
       toast.success('Code submitted! Check the chat for feedback.')
       
+      // Note: Status remains 'in_progress' - user can continue working on the task
+      // If code is incorrect, user can return to CodeEditor and try again
+      // Status will only change to 'completed' when user explicitly marks task as complete
+      
       // Navigate to chat with this session and taskId
       router.push(`/chat?sessionId=${sessionId}&taskId=${taskDataSimple.id}`)
     } catch (error) {
@@ -280,33 +284,65 @@ function TaskPageContent() {
         </div>
         
         <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-4 sm:p-6 mb-6">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <button
+              onClick={handleContinueInChat}
+              className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
+            >
+              Continue in Chat
+            </button>
+            
+            <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
               <button
-                onClick={handleContinueInChat}
+                onClick={() => {
+                  const starterCode = (taskData as { starterCode?: string | null })?.starterCode || ''
+                  setCode(starterCode)
+                }}
                 className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
               >
-                Continue in Chat
+                Reset to Starter Code
               </button>
-              
-              <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
-                <button
-                  onClick={() => {
-                    const starterCode = (taskData as { starterCode?: string | null })?.starterCode || ''
+              <button
+                onClick={async () => {
+                  if (!taskData) return
+                  if (!confirm('Are you sure you want to restart this task? Your code will be reset to starter code.')) {
+                    return
+                  }
+                  
+                  try {
+                    type TaskDataSimple = {
+                      id: string
+                      starterCode?: string | null
+                    }
+                    const taskDataSimple = taskData as TaskDataSimple
+                    
+                    // Reset task status to not_started
+                    await updateProgressMutation.mutateAsync({
+                      taskId: taskDataSimple.id,
+                      status: 'not_started',
+                    })
+                    
+                    // Reset code to starter code
+                    const starterCode = taskDataSimple.starterCode || ''
                     setCode(starterCode)
-                  }}
-                  className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
-                >
-                  Reset to Starter Code
-                </button>
-                <button
-                  onClick={handleSubmitCode}
-                  disabled={!code.trim() || isSubmitting}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-                >
-                  {isSubmitting ? 'Submitting...' : 'Submit Code'}
-                </button>
-              </div>
+                    
+                    toast.success('Task restarted! You can start fresh.')
+                  } catch (error) {
+                    console.error('Error restarting task:', error)
+                    toast.error('Failed to restart task. Please try again.')
+                  }
+                }}
+                className="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+              >
+                Restart Task
+              </button>
+              <button
+                onClick={handleSubmitCode}
+                disabled={!code.trim() || isSubmitting}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Code'}
+              </button>
             </div>
           </div>
         </div>
