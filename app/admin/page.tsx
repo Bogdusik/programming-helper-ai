@@ -21,6 +21,7 @@ export default function AdminPage() {
   const [showChartsModal, setShowChartsModal] = useState(false)
   const [showReportsModal, setShowReportsModal] = useState(false)
   const [showMonitoringModal, setShowMonitoringModal] = useState(false)
+  const [showAssessmentAnalysisModal, setShowAssessmentAnalysisModal] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [usersPage, setUsersPage] = useState(1)
   const [usersSearch, setUsersSearch] = useState('')
@@ -237,6 +238,15 @@ export default function AdminPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
                   <span>Monitoring</span>
+                </button>
+                <button 
+                  onClick={() => setShowAssessmentAnalysisModal(true)}
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center space-x-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                  <span>Assessment Analysis</span>
                 </button>
               </div>
             </div>
@@ -883,6 +893,14 @@ export default function AdminPage() {
         <MonitoringModal
           isOpen={showMonitoringModal}
           onClose={() => setShowMonitoringModal(false)}
+        />
+      )}
+
+      {/* Assessment Analysis Modal */}
+      {showAssessmentAnalysisModal && (
+        <AssessmentAnalysisModal
+          isOpen={showAssessmentAnalysisModal}
+          onClose={() => setShowAssessmentAnalysisModal(false)}
         />
       )}
     </div>
@@ -1983,6 +2001,588 @@ function ExportModal({ isOpen, onClose, format, onFormatChange }: {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Assessment Analysis Modal Component
+function AssessmentAnalysisModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'questions' | 'visualizations'>('overview')
+  const [usersPage, setUsersPage] = useState(1)
+  const [usersLanguage, setUsersLanguage] = useState<string>('')
+  const [minImprovement, setMinImprovement] = useState<string>('')
+  const [maxImprovement, setMaxImprovement] = useState<string>('')
+
+  const { data: overviewData, isLoading: overviewLoading } = trpc.admin.getAssessmentOverview.useQuery(undefined, {
+    enabled: isOpen && activeTab === 'overview',
+  })
+
+  const { data: userComparisonData, isLoading: usersLoading } = trpc.admin.getAssessmentUserComparison.useQuery({
+    page: usersPage,
+    limit: 20,
+    language: usersLanguage || undefined,
+    minImprovement: minImprovement ? Number(minImprovement) : undefined,
+    maxImprovement: maxImprovement ? Number(maxImprovement) : undefined,
+  }, {
+    enabled: isOpen && activeTab === 'users',
+  })
+
+  const { data: questionInsightsData, isLoading: questionsLoading } = trpc.admin.getAssessmentQuestionInsights.useQuery(undefined, {
+    enabled: isOpen && activeTab === 'questions',
+  })
+
+  if (!isOpen) return null
+
+  const tabs = [
+    { id: 'overview' as const, label: 'Overview', icon: '📊' },
+    { id: 'users' as const, label: 'User Comparison', icon: '👥' },
+    { id: 'questions' as const, label: 'Question Insights', icon: '❓' },
+    { id: 'visualizations' as const, label: 'Visualizations', icon: '📈' },
+  ]
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="glass rounded-2xl p-6 max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-white">Assessment Analysis</h2>
+          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 border-b border-white/10">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                activeTab === tab.id
+                  ? 'border-teal-400 text-teal-400'
+                  : 'border-transparent text-white/70 hover:text-white'
+              }`}
+            >
+              <span className="mr-2">{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        <div className="min-h-[400px]">
+          {activeTab === 'overview' && (
+            <OverviewTab data={overviewData} isLoading={overviewLoading} />
+          )}
+
+          {activeTab === 'users' && (
+            <UserComparisonTab
+              data={userComparisonData}
+              isLoading={usersLoading}
+              page={usersPage}
+              onPageChange={setUsersPage}
+              language={usersLanguage}
+              onLanguageChange={setUsersLanguage}
+              minImprovement={minImprovement}
+              onMinImprovementChange={setMinImprovement}
+              maxImprovement={maxImprovement}
+              onMaxImprovementChange={setMaxImprovement}
+            />
+          )}
+
+          {activeTab === 'questions' && (
+            <QuestionInsightsTab data={questionInsightsData} isLoading={questionsLoading} />
+          )}
+
+          {activeTab === 'visualizations' && (
+            <VisualizationsTab overviewData={overviewData} userComparisonData={userComparisonData} questionInsightsData={questionInsightsData} />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Overview Tab Component
+function OverviewTab({ data, isLoading }: { data: any; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <div className="text-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-400 mx-auto"></div>
+        <p className="mt-4 text-white/70">Loading overview data...</p>
+      </div>
+    )
+  }
+
+  if (!data) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-white/70">No data available</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Key Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="text-white/60 text-xs mb-1">Pre-Assessments</div>
+          <div className="text-2xl font-bold text-white">{data.totalPreAssessments}</div>
+          <div className="text-white/50 text-xs mt-1">{data.usersWithPre} users</div>
+        </div>
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="text-white/60 text-xs mb-1">Post-Assessments</div>
+          <div className="text-2xl font-bold text-white">{data.totalPostAssessments}</div>
+          <div className="text-white/50 text-xs mt-1">{data.usersWithPost} users</div>
+        </div>
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="text-white/60 text-xs mb-1">Completion Rate</div>
+          <div className="text-2xl font-bold text-white">{Math.round(data.completionRate)}%</div>
+          <div className="text-white/50 text-xs mt-1">{data.usersWithBoth} with both</div>
+        </div>
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="text-white/60 text-xs mb-1">Avg Improvement</div>
+          <div className={`text-2xl font-bold ${data.avgImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {data.avgImprovement >= 0 ? '+' : ''}{data.avgImprovement}%
+          </div>
+          <div className="text-white/50 text-xs mt-1">Score change</div>
+        </div>
+      </div>
+
+      {/* Score Comparison */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="text-white/70 text-sm mb-3">Average Scores</div>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-white/60 text-sm">Pre-Assessment</span>
+              <span className="text-white font-semibold">{data.avgPreScore}%</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-white/60 text-sm">Post-Assessment</span>
+              <span className="text-white font-semibold">{data.avgPostScore}%</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-white/10">
+              <div className="flex justify-between items-center">
+                <span className="text-white/60 text-sm">Improvement</span>
+                <span className={`font-semibold ${data.avgImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {data.avgImprovement >= 0 ? '+' : ''}{data.avgImprovement}%
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="text-white/70 text-sm mb-3">Confidence Change</div>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-white/60 text-sm">Average Change</span>
+              <span className={`font-semibold ${data.avgConfidenceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {data.avgConfidenceChange >= 0 ? '+' : ''}{data.avgConfidenceChange.toFixed(1)}
+              </span>
+            </div>
+            <div className="text-white/50 text-xs mt-3">
+              On a scale of 1-5
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Improvement Distribution */}
+      {data.improvementDistribution && (
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <div className="text-white/70 text-sm mb-3">Improvement Distribution</div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-400">{data.improvementDistribution.improved}</div>
+              <div className="text-white/60 text-xs mt-1">Improved</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-400">{data.improvementDistribution.noChange}</div>
+              <div className="text-white/60 text-xs mt-1">No Change</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-red-400">{data.improvementDistribution.declined}</div>
+              <div className="text-white/60 text-xs mt-1">Declined</div>
+            </div>
+          </div>
+          <div className="text-white/50 text-xs mt-3 text-center">
+            Total: {data.improvementDistribution.total} users
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// User Comparison Tab Component
+function UserComparisonTab({
+  data,
+  isLoading,
+  page,
+  onPageChange,
+  language,
+  onLanguageChange,
+  minImprovement,
+  onMinImprovementChange,
+  maxImprovement,
+  onMaxImprovementChange,
+}: {
+  data: any
+  isLoading: boolean
+  page: number
+  onPageChange: (page: number) => void
+  language: string
+  onLanguageChange: (lang: string) => void
+  minImprovement: string
+  onMinImprovementChange: (val: string) => void
+  maxImprovement: string
+  onMaxImprovementChange: (val: string) => void
+}) {
+  if (isLoading) {
+    return (
+      <div className="text-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-400 mx-auto"></div>
+        <p className="mt-4 text-white/70">Loading user comparison data...</p>
+      </div>
+    )
+  }
+
+  if (!data || !data.comparisons || data.comparisons.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-white/70">No user comparison data available</p>
+        <p className="text-white/50 text-sm mt-2">Users need to complete both pre and post assessments</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-white/70 text-sm mb-2">Language</label>
+            <select
+              value={language}
+              onChange={(e) => onLanguageChange(e.target.value)}
+              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+            >
+              <option value="">All Languages</option>
+              <option value="javascript">JavaScript</option>
+              <option value="python">Python</option>
+              <option value="java">Java</option>
+              <option value="typescript">TypeScript</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-white/70 text-sm mb-2">Min Improvement (%)</label>
+            <input
+              type="number"
+              value={minImprovement}
+              onChange={(e) => onMinImprovementChange(e.target.value)}
+              placeholder="Any"
+              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+            />
+          </div>
+          <div>
+            <label className="block text-white/70 text-sm mb-2">Max Improvement (%)</label>
+            <input
+              type="number"
+              value={maxImprovement}
+              onChange={(e) => onMaxImprovementChange(e.target.value)}
+              placeholder="Any"
+              className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white/5 rounded-lg border border-white/10 overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-white/5">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase">User ID</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase">Pre Score</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase">Post Score</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase">Improvement</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase">Confidence</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase">Days</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-white/70 uppercase">Language</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/10">
+            {data.comparisons.map((comp: any, idx: number) => (
+              <tr key={idx} className="hover:bg-white/5">
+                <td className="px-4 py-3 text-sm text-white font-mono">{comp.userId.slice(0, 8)}...</td>
+                <td className="px-4 py-3 text-sm text-white">{comp.preScore}/{comp.preTotal} ({comp.prePercentage}%)</td>
+                <td className="px-4 py-3 text-sm text-white">{comp.postScore}/{comp.postTotal} ({comp.postPercentage}%)</td>
+                <td className={`px-4 py-3 text-sm font-semibold ${comp.improvement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {comp.improvement >= 0 ? '+' : ''}{comp.improvement}%
+                </td>
+                <td className="px-4 py-3 text-sm text-white">
+                  {comp.preConfidence} → {comp.postConfidence}
+                  {comp.confidenceChange !== 0 && (
+                    <span className={`ml-1 ${comp.confidenceChange > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      ({comp.confidenceChange > 0 ? '+' : ''}{comp.confidenceChange})
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-sm text-white/70">{comp.daysBetween} days</td>
+                <td className="px-4 py-3 text-sm text-white capitalize">{comp.language || 'N/A'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {data.pagination && data.pagination.totalPages > 1 && (
+        <div className="flex justify-between items-center">
+          <button
+            onClick={() => onPageChange(page - 1)}
+            disabled={page === 1}
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+          >
+            Previous
+          </button>
+          <span className="text-white/70 text-sm">
+            Page {data.pagination.page} of {data.pagination.totalPages} ({data.pagination.total} total)
+          </span>
+          <button
+            onClick={() => onPageChange(page + 1)}
+            disabled={page >= data.pagination.totalPages}
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md text-sm font-medium transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Question Insights Tab Component
+function QuestionInsightsTab({ data, isLoading }: { data: any; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <div className="text-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-400 mx-auto"></div>
+        <p className="mt-4 text-white/70">Loading question insights...</p>
+      </div>
+    )
+  }
+
+  if (!data) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-white/70">No question insights available</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Category Stats */}
+      {data.categoryStats && data.categoryStats.length > 0 && (
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <h3 className="text-white font-semibold mb-4">Improvement by Category</h3>
+          <div className="space-y-3">
+            {data.categoryStats.map((cat: any, idx: number) => (
+              <div key={idx} className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-white capitalize font-medium">{cat.category}</span>
+                  <span className={`font-semibold ${cat.avgImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {cat.avgImprovement >= 0 ? '+' : ''}{cat.avgImprovement}%
+                  </span>
+                </div>
+                <div className="flex gap-4 text-sm text-white/60">
+                  <span>Pre: {cat.avgPreAccuracy}%</span>
+                  <span>Post: {cat.avgPostAccuracy}%</span>
+                  <span>{cat.totalQuestions} questions</span>
+                </div>
+                <div className="w-full bg-white/10 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all ${
+                      cat.avgImprovement >= 0 ? 'bg-green-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${Math.min(Math.abs(cat.avgImprovement), 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Top Questions */}
+      {data.questionInsights && data.questionInsights.length > 0 && (
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <h3 className="text-white font-semibold mb-4">Top Improved Questions</h3>
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {data.questionInsights.slice(0, 10).map((q: any, idx: number) => (
+              <div key={idx} className="bg-white/5 rounded p-3 border border-white/10">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <div className="text-white text-sm font-medium">Question {q.questionId.slice(0, 8)}...</div>
+                    <div className="text-white/60 text-xs mt-1 capitalize">
+                      {q.category} • {q.difficulty} {q.language ? `• ${q.language}` : ''}
+                    </div>
+                  </div>
+                  <span className={`font-semibold ${q.improvement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {q.improvement >= 0 ? '+' : ''}{q.improvement}%
+                  </span>
+                </div>
+                <div className="flex gap-4 text-xs text-white/60">
+                  <span>Pre: {q.preCorrect}/{q.preTotal} ({q.preAccuracy}%)</span>
+                  <span>Post: {q.postCorrect}/{q.postTotal} ({q.postAccuracy}%)</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Visualizations Tab Component
+function VisualizationsTab({ overviewData, userComparisonData, questionInsightsData }: {
+  overviewData: any
+  userComparisonData: any
+  questionInsightsData: any
+}) {
+  if (!overviewData && !userComparisonData && !questionInsightsData) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-white/70">No visualization data available</p>
+        <p className="text-white/50 text-sm mt-2">Please check other tabs for data</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {overviewData && (
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <h3 className="text-white font-semibold mb-4">Improvement Distribution</h3>
+          {overviewData.improvementDistribution && overviewData.improvementDistribution.total > 0 && (
+            <div className="h-64 flex items-end justify-center gap-4">
+              <div className="flex flex-col items-center">
+                <div
+                  className="w-16 bg-green-500 rounded-t transition-all hover:bg-green-400"
+                  style={{
+                    height: `${(overviewData.improvementDistribution.improved / overviewData.improvementDistribution.total) * 100}%`,
+                    minHeight: overviewData.improvementDistribution.improved > 0 ? '20px' : '0',
+                  }}
+                  title={`Improved: ${overviewData.improvementDistribution.improved}`}
+                />
+                <div className="text-white/70 text-xs mt-2 text-center">Improved<br/>{overviewData.improvementDistribution.improved}</div>
+              </div>
+              <div className="flex flex-col items-center">
+                <div
+                  className="w-16 bg-yellow-500 rounded-t transition-all hover:bg-yellow-400"
+                  style={{
+                    height: `${(overviewData.improvementDistribution.noChange / overviewData.improvementDistribution.total) * 100}%`,
+                    minHeight: overviewData.improvementDistribution.noChange > 0 ? '20px' : '0',
+                  }}
+                  title={`No Change: ${overviewData.improvementDistribution.noChange}`}
+                />
+                <div className="text-white/70 text-xs mt-2 text-center">No Change<br/>{overviewData.improvementDistribution.noChange}</div>
+              </div>
+              <div className="flex flex-col items-center">
+                <div
+                  className="w-16 bg-red-500 rounded-t transition-all hover:bg-red-400"
+                  style={{
+                    height: `${(overviewData.improvementDistribution.declined / overviewData.improvementDistribution.total) * 100}%`,
+                    minHeight: overviewData.improvementDistribution.declined > 0 ? '20px' : '0',
+                  }}
+                  title={`Declined: ${overviewData.improvementDistribution.declined}`}
+                />
+                <div className="text-white/70 text-xs mt-2 text-center">Declined<br/>{overviewData.improvementDistribution.declined}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {userComparisonData && userComparisonData.comparisons && userComparisonData.comparisons.length > 0 && (
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <h3 className="text-white font-semibold mb-4">Pre vs Post Score Comparison</h3>
+          <div className="h-64 flex items-end justify-between gap-1 overflow-x-auto">
+            {userComparisonData.comparisons.slice(0, 20).map((comp: any, idx: number) => {
+              const maxScore = 100
+              const preHeight = (comp.prePercentage / maxScore) * 100
+              const postHeight = (comp.postPercentage / maxScore) * 100
+              return (
+                <div key={idx} className="flex-1 flex flex-col items-center min-w-0">
+                  <div className="w-full flex gap-0.5 items-end justify-center" style={{ height: '200px' }}>
+                    <div
+                      className="flex-1 bg-blue-500/70 rounded-t transition-all hover:bg-blue-400"
+                      style={{ height: `${preHeight}%`, minHeight: comp.prePercentage > 0 ? '2px' : '0' }}
+                      title={`Pre: ${comp.prePercentage}%`}
+                    />
+                    <div
+                      className="flex-1 bg-green-500/70 rounded-t transition-all hover:bg-green-400"
+                      style={{ height: `${postHeight}%`, minHeight: comp.postPercentage > 0 ? '2px' : '0' }}
+                      title={`Post: ${comp.postPercentage}%`}
+                    />
+                  </div>
+                  <div className="text-white/50 text-xs mt-2 h-8 flex items-start justify-center">
+                    <span className="transform -rotate-45 origin-center whitespace-nowrap">{idx + 1}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex justify-center gap-4 mt-4">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-blue-500/70 rounded"></div>
+              <span className="text-white/70 text-xs">Pre-Assessment</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-green-500/70 rounded"></div>
+              <span className="text-white/70 text-xs">Post-Assessment</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {questionInsightsData && questionInsightsData.categoryStats && questionInsightsData.categoryStats.length > 0 && (
+        <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+          <h3 className="text-white font-semibold mb-4">Category Improvement</h3>
+          <div className="space-y-3">
+            {questionInsightsData.categoryStats.map((cat: any, idx: number) => {
+              const improvements = questionInsightsData.categoryStats.map((c: any) => Math.abs(c.avgImprovement))
+              const maxImprovement = improvements.length > 0 ? Math.max(...improvements, 1) : 1
+              const barWidth = maxImprovement > 0 ? (Math.abs(cat.avgImprovement) / maxImprovement) * 100 : 0
+              return (
+                <div key={idx} className="space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-white capitalize">{cat.category}</span>
+                    <span className={`font-semibold ${cat.avgImprovement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {cat.avgImprovement >= 0 ? '+' : ''}{cat.avgImprovement}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-white/10 rounded-full h-3">
+                    <div
+                      className={`h-3 rounded-full transition-all ${
+                        cat.avgImprovement >= 0 ? 'bg-green-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${barWidth}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

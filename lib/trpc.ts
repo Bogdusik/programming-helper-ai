@@ -1855,6 +1855,408 @@ export const appRouter = router({
           },
         }
       }),
+
+    // ========== ASSESSMENT ANALYSIS ==========
+    getAssessmentOverview: adminProcedure
+      .query(async () => {
+        // Get all assessments
+        const allAssessments = await db.assessment.findMany({
+          include: {
+            user: {
+              select: {
+                id: true,
+                assessedLevel: true,
+              },
+            },
+          },
+          orderBy: { completedAt: 'desc' },
+        })
+
+        const preAssessments = allAssessments.filter(a => a.type === 'pre')
+        const postAssessments = allAssessments.filter(a => a.type === 'post')
+
+        // Get users with both pre and post assessments
+        const usersWithBoth = new Set<string>()
+        const userAssessments = new Map<string, { pre?: typeof allAssessments[0], post?: typeof allAssessments[0] }>()
+
+        allAssessments.forEach(assessment => {
+          if (!userAssessments.has(assessment.userId)) {
+            userAssessments.set(assessment.userId, {})
+          }
+          const userData = userAssessments.get(assessment.userId)!
+          if (assessment.type === 'pre') {
+            userData.pre = assessment
+          } else {
+            userData.post = assessment
+          }
+          if (userData.pre && userData.post) {
+            usersWithBoth.add(assessment.userId)
+          }
+        })
+
+        // Calculate improvement scores
+        const improvementScores: number[] = []
+        const confidenceChanges: number[] = []
+
+        usersWithBoth.forEach(userId => {
+          const assessments = userAssessments.get(userId)!
+          if (assessments.pre && assessments.post) {
+            const preScore = assessments.pre.score || 0
+            const preTotal = assessments.pre.totalQuestions || 1
+            const postScore = assessments.post.score || 0
+            const postTotal = assessments.post.totalQuestions || 1
+
+            const prePercentage = (preScore / preTotal) * 100
+            const postPercentage = (postScore / postTotal) * 100
+            const improvement = postPercentage - prePercentage
+
+            improvementScores.push(improvement)
+            confidenceChanges.push(assessments.post.confidence - assessments.pre.confidence)
+          }
+        })
+
+        // Calculate averages
+        const avgPreScore = preAssessments.length > 0
+          ? preAssessments.reduce((sum, a) => {
+              const score = a.score || 0
+              const total = a.totalQuestions || 1
+              return sum + (score / total) * 100
+            }, 0) / preAssessments.length
+          : 0
+
+        const avgPostScore = postAssessments.length > 0
+          ? postAssessments.reduce((sum, a) => {
+              const score = a.score || 0
+              const total = a.totalQuestions || 1
+              return sum + (score / total) * 100
+            }, 0) / postAssessments.length
+          : 0
+
+        const avgImprovement = improvementScores.length > 0
+          ? improvementScores.reduce((sum, score) => sum + score, 0) / improvementScores.length
+          : 0
+
+        const avgConfidenceChange = confidenceChanges.length > 0
+          ? confidenceChanges.reduce((sum, change) => sum + change, 0) / confidenceChanges.length
+          : 0
+
+        // Count improvement distribution
+        const improved = improvementScores.filter(score => score > 0).length
+        const noChange = improvementScores.filter(score => score === 0).length
+        const declined = improvementScores.filter(score => score < 0).length
+
+        // Get completion rate
+        const uniqueUsersWithPre = new Set(preAssessments.map(a => a.userId)).size
+        const uniqueUsersWithPost = new Set(postAssessments.map(a => a.userId)).size
+        const completionRate = uniqueUsersWithPre > 0
+          ? (uniqueUsersWithPost / uniqueUsersWithPre) * 100
+          : 0
+
+        return {
+          totalPreAssessments: preAssessments.length,
+          totalPostAssessments: postAssessments.length,
+          usersWithPre: uniqueUsersWithPre,
+          usersWithPost: uniqueUsersWithPost,
+          usersWithBoth: usersWithBoth.size,
+          completionRate,
+          avgPreScore: Math.round(avgPreScore * 10) / 10,
+          avgPostScore: Math.round(avgPostScore * 10) / 10,
+          avgImprovement: Math.round(avgImprovement * 10) / 10,
+          avgConfidenceChange: Math.round(avgConfidenceChange * 10) / 10,
+          improvementDistribution: {
+            improved,
+            noChange,
+            declined,
+            total: improvementScores.length,
+          },
+        }
+      }),
+
+    getAssessmentUserComparison: adminProcedure
+      .input(z.object({
+        page: z.number().min(1).default(1),
+        limit: z.number().min(1).max(100).default(20),
+        language: z.string().optional(),
+        minImprovement: z.number().optional(),
+        maxImprovement: z.number().optional(),
+      }))
+      .query(async ({ input }) => {
+        // Get all users with both assessments
+        const allAssessments = await db.assessment.findMany({
+          include: {
+            user: {
+              select: {
+                id: true,
+                assessedLevel: true,
+                createdAt: true,
+              },
+            },
+          },
+          orderBy: { completedAt: 'desc' },
+        })
+
+        // Group by user
+        const userAssessments = new Map<string, {
+          userId: string
+          pre?: typeof allAssessments[0]
+          post?: typeof allAssessments[0]
+          user: typeof allAssessments[0]['user']
+        }>()
+
+        allAssessments.forEach(assessment => {
+          if (!userAssessments.has(assessment.userId)) {
+            userAssessments.set(assessment.userId, {
+              userId: assessment.userId,
+              user: assessment.user,
+            })
+          }
+          const userData = userAssessments.get(assessment.userId)!
+          if (assessment.type === 'pre') {
+            userData.pre = assessment
+          } else {
+            userData.post = assessment
+          }
+        })
+
+        // Filter users with both assessments
+        let comparisons = Array.from(userAssessments.values())
+          .filter(data => data.pre && data.post)
+          .map(data => {
+            const pre = data.pre!
+            const post = data.post!
+            const preScore = pre.score || 0
+            const preTotal = pre.totalQuestions || 1
+            const postScore = post.score || 0
+            const postTotal = post.totalQuestions || 1
+
+            const prePercentage = (preScore / preTotal) * 100
+            const postPercentage = (postScore / postTotal) * 100
+            const improvement = postPercentage - prePercentage
+
+            const daysBetween = Math.floor(
+              (new Date(post.completedAt).getTime() - new Date(pre.completedAt).getTime()) / (1000 * 60 * 60 * 24)
+            )
+
+            return {
+              userId: data.userId,
+              preScore: preScore,
+              preTotal: preTotal,
+              prePercentage: Math.round(prePercentage * 10) / 10,
+              preConfidence: pre.confidence,
+              postScore: postScore,
+              postTotal: postTotal,
+              postPercentage: Math.round(postPercentage * 10) / 10,
+              postConfidence: post.confidence,
+              improvement: Math.round(improvement * 10) / 10,
+              confidenceChange: post.confidence - pre.confidence,
+              daysBetween,
+              language: pre.language || post.language || null,
+              assessedLevel: data.user.assessedLevel,
+              preCompletedAt: pre.completedAt,
+              postCompletedAt: post.completedAt,
+            }
+          })
+
+        // Apply filters
+        if (input.language) {
+          comparisons = comparisons.filter(c => c.language === input.language)
+        }
+        if (input.minImprovement !== undefined) {
+          comparisons = comparisons.filter(c => c.improvement >= input.minImprovement!)
+        }
+        if (input.maxImprovement !== undefined) {
+          comparisons = comparisons.filter(c => c.improvement <= input.maxImprovement!)
+        }
+
+        // Sort by improvement (descending)
+        comparisons.sort((a, b) => b.improvement - a.improvement)
+
+        // Paginate
+        const total = comparisons.length
+        const start = (input.page - 1) * input.limit
+        const end = start + input.limit
+        const paginated = comparisons.slice(start, end)
+
+        return {
+          comparisons: paginated,
+          pagination: {
+            page: input.page,
+            limit: input.limit,
+            total,
+            totalPages: Math.ceil(total / input.limit),
+          },
+        }
+      }),
+
+    getAssessmentQuestionInsights: adminProcedure
+      .query(async () => {
+        // Get all assessments with answers
+        const allAssessments = await db.assessment.findMany({
+          include: {
+            user: {
+              select: {
+                id: true,
+              },
+            },
+          },
+          orderBy: { completedAt: 'desc' },
+        })
+
+        // Get all questions to map IDs to categories
+        const allQuestions = await db.assessmentQuestion.findMany({
+          select: {
+            id: true,
+            category: true,
+            difficulty: true,
+            language: true,
+          },
+        })
+
+        const questionMap = new Map(allQuestions.map(q => [q.id, q]))
+
+        // Group by user
+        const userAssessments = new Map<string, {
+          pre?: typeof allAssessments[0]
+          post?: typeof allAssessments[0]
+        }>()
+
+        allAssessments.forEach(assessment => {
+          if (!userAssessments.has(assessment.userId)) {
+            userAssessments.set(assessment.userId, {})
+          }
+          const userData = userAssessments.get(assessment.userId)!
+          if (assessment.type === 'pre') {
+            userData.pre = assessment
+          } else {
+            userData.post = assessment
+          }
+        })
+
+        // Analyze question performance
+        const questionStats = new Map<string, {
+          questionId: string
+          category: string
+          difficulty: string
+          language: string | null
+          preCorrect: number
+          preTotal: number
+          postCorrect: number
+          postTotal: number
+        }>()
+
+        userAssessments.forEach((assessments, userId) => {
+          if (assessments.pre && assessments.post) {
+            const preAnswers = Array.isArray(assessments.pre.answers)
+              ? assessments.pre.answers as Array<{ questionId?: string; isCorrect?: boolean }>
+              : []
+            const postAnswers = Array.isArray(assessments.post.answers)
+              ? assessments.post.answers as Array<{ questionId?: string; isCorrect?: boolean }>
+              : []
+
+            preAnswers.forEach(answer => {
+              if (answer.questionId) {
+                const question = questionMap.get(answer.questionId)
+                if (question) {
+                  if (!questionStats.has(answer.questionId)) {
+                    questionStats.set(answer.questionId, {
+                      questionId: answer.questionId,
+                      category: question.category,
+                      difficulty: question.difficulty,
+                      language: question.language,
+                      preCorrect: 0,
+                      preTotal: 0,
+                      postCorrect: 0,
+                      postTotal: 0,
+                    })
+                  }
+                  const stats = questionStats.get(answer.questionId)!
+                  stats.preTotal++
+                  if (answer.isCorrect) {
+                    stats.preCorrect++
+                  }
+                }
+              }
+            })
+
+            postAnswers.forEach(answer => {
+              if (answer.questionId) {
+                const question = questionMap.get(answer.questionId)
+                if (question) {
+                  if (!questionStats.has(answer.questionId)) {
+                    questionStats.set(answer.questionId, {
+                      questionId: answer.questionId,
+                      category: question.category,
+                      difficulty: question.difficulty,
+                      language: question.language,
+                      preCorrect: 0,
+                      preTotal: 0,
+                      postCorrect: 0,
+                      postTotal: 0,
+                    })
+                  }
+                  const stats = questionStats.get(answer.questionId)!
+                  stats.postTotal++
+                  if (answer.isCorrect) {
+                    stats.postCorrect++
+                  }
+                }
+              }
+            })
+          }
+        })
+
+        // Convert to array and calculate improvement
+        const questionInsights = Array.from(questionStats.values()).map(stats => {
+          const preAccuracy = stats.preTotal > 0 ? (stats.preCorrect / stats.preTotal) * 100 : 0
+          const postAccuracy = stats.postTotal > 0 ? (stats.postCorrect / stats.postTotal) * 100 : 0
+          const improvement = postAccuracy - preAccuracy
+
+          return {
+            ...stats,
+            preAccuracy: Math.round(preAccuracy * 10) / 10,
+            postAccuracy: Math.round(postAccuracy * 10) / 10,
+            improvement: Math.round(improvement * 10) / 10,
+          }
+        })
+
+        // Group by category
+        const categoryStats = new Map<string, {
+          category: string
+          totalQuestions: number
+          avgPreAccuracy: number
+          avgPostAccuracy: number
+          avgImprovement: number
+        }>()
+
+        questionInsights.forEach(insight => {
+          if (!categoryStats.has(insight.category)) {
+            categoryStats.set(insight.category, {
+              category: insight.category,
+              totalQuestions: 0,
+              avgPreAccuracy: 0,
+              avgPostAccuracy: 0,
+              avgImprovement: 0,
+            })
+          }
+          const catStats = categoryStats.get(insight.category)!
+          catStats.totalQuestions++
+          catStats.avgPreAccuracy += insight.preAccuracy
+          catStats.avgPostAccuracy += insight.postAccuracy
+          catStats.avgImprovement += insight.improvement
+        })
+
+        // Calculate averages
+        categoryStats.forEach(stats => {
+          stats.avgPreAccuracy = Math.round((stats.avgPreAccuracy / stats.totalQuestions) * 10) / 10
+          stats.avgPostAccuracy = Math.round((stats.avgPostAccuracy / stats.totalQuestions) * 10) / 10
+          stats.avgImprovement = Math.round((stats.avgImprovement / stats.totalQuestions) * 10) / 10
+        })
+
+        return {
+          questionInsights: questionInsights.sort((a, b) => b.improvement - a.improvement),
+          categoryStats: Array.from(categoryStats.values()).sort((a, b) => b.avgImprovement - a.avgImprovement),
+        }
+      }),
   }),
 
   profile: router({
