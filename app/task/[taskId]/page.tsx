@@ -38,10 +38,12 @@ function TaskPageContent() {
   
   // Initialize code with starter code if available
   useEffect(() => {
-    if (taskData?.starterCode && !code) {
-      setCode(taskData.starterCode)
+    // Use type assertion to avoid deep type recursion
+    const starterCode = (taskData as { starterCode?: string | null })?.starterCode
+    if (starterCode && !code) {
+      setCode(starterCode)
     }
-  }, [taskData?.starterCode, code])
+  }, [taskData, code])
   
   const handleSubmitCode = async () => {
     if (!taskData || !code.trim() || isSubmitting) return
@@ -52,26 +54,35 @@ function TaskPageContent() {
       // Create or get session for this task
       let sessionId: string | undefined
       
+      // Use type assertion to avoid deep type recursion
+      type TaskDataSimple = {
+        id: string
+        title: string
+        language: string
+        userProgress?: Array<{ chatSessionId?: string | null }>
+      }
+      const taskDataSimple = taskData as TaskDataSimple
+      
       // Try to get existing session from task progress
-      const progress = taskData.userProgress?.[0]
+      const progress = taskDataSimple.userProgress?.[0]
       if (progress?.chatSessionId) {
         sessionId = progress.chatSessionId
       } else {
         // Create new session
         const session = await createSessionMutation.mutateAsync({
-          title: `Task: ${taskData.title}`,
+          title: `Task: ${taskDataSimple.title}`,
         })
         sessionId = session.id
         
         // Update task progress with session ID
         await updateProgressMutation.mutateAsync({
-          taskId: taskData.id,
+          taskId: taskDataSimple.id,
           chatSessionId: sessionId,
         })
       }
       
       // Send code to chat
-      const message = `Here's my solution for the task:\n\n\`\`\`${taskData.language}\n${code}\n\`\`\`\n\nPlease review my code and provide feedback.`
+      const message = `Here's my solution for the task:\n\n\`\`\`${taskDataSimple.language}\n${code}\n\`\`\`\n\nPlease review my code and provide feedback.`
       
       await sendMessageMutation.mutateAsync({
         message,
@@ -94,20 +105,28 @@ function TaskPageContent() {
     if (!taskData) return
     
     try {
+      // Use type assertion to avoid deep type recursion
+      type TaskDataSimple = {
+        id: string
+        title: string
+        userProgress?: Array<{ chatSessionId?: string | null }>
+      }
+      const taskDataSimple = taskData as TaskDataSimple
+      
       // Get or create session
-      const progress = taskData.userProgress?.[0]
+      const progress = taskDataSimple.userProgress?.[0]
       let sessionId: string | undefined
       
       if (progress?.chatSessionId) {
         sessionId = progress.chatSessionId
       } else {
         const session = await createSessionMutation.mutateAsync({
-          title: `Task: ${taskData.title}`,
+          title: `Task: ${taskDataSimple.title}`,
         })
         sessionId = session.id
         
         await updateProgressMutation.mutateAsync({
-          taskId: taskData.id,
+          taskId: taskDataSimple.id,
           chatSessionId: sessionId,
         })
       }
@@ -164,14 +183,25 @@ function TaskPageContent() {
   }
   
   // Build question text with task description, hints, etc.
-  const questionText = `**${taskData.title}**\n\n${taskData.description}\n\n` +
-    `**Language:** ${taskData.language}\n` +
-    `**Difficulty:** ${taskData.difficulty}\n` +
-    `**Category:** ${taskData.category}\n\n` +
-    (taskData.hints && taskData.hints.length > 0
-      ? `**Hints:**\n${taskData.hints.map((hint, i) => `${i + 1}. ${hint}`).join('\n')}\n\n`
+  // Use type assertion to avoid deep type recursion
+  const taskDataTyped = taskData as {
+    title: string
+    description: string
+    language: string
+    difficulty: string
+    category: string
+    hints?: string[]
+    starterCode?: string | null
+  }
+  
+  const questionText = `**${taskDataTyped.title}**\n\n${taskDataTyped.description}\n\n` +
+    `**Language:** ${taskDataTyped.language}\n` +
+    `**Difficulty:** ${taskDataTyped.difficulty}\n` +
+    `**Category:** ${taskDataTyped.category}\n\n` +
+    (taskDataTyped.hints && taskDataTyped.hints.length > 0
+      ? `**Hints:**\n${taskDataTyped.hints.map((hint, i) => `${i + 1}. ${hint}`).join('\n')}\n\n`
       : '') +
-    (taskData.starterCode ? `**Starter Code:**\n\`\`\`${taskData.language}\n${taskData.starterCode}\n\`\`\`` : '')
+    (taskDataTyped.starterCode ? `**Starter Code:**\n\`\`\`${taskDataTyped.language}\n${taskDataTyped.starterCode}\n\`\`\`` : '')
   
   return (
     <div className="min-h-screen gradient-bg">
@@ -179,7 +209,7 @@ function TaskPageContent() {
       <MinimalBackground />
       
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6 flex items-center justify-between">
           <button
             onClick={() => router.push('/tasks')}
             className="text-white/70 hover:text-white flex items-center space-x-2"
@@ -192,13 +222,13 @@ function TaskPageContent() {
           
           <div className="flex items-center space-x-2">
             <span className="px-3 py-1 bg-blue-500/20 text-blue-300 text-sm rounded-full capitalize">
-              {taskData.language}
+              {taskDataTyped.language}
             </span>
             <span className="px-3 py-1 bg-purple-500/20 text-purple-300 text-sm rounded-full capitalize">
-              {taskData.difficulty}
+              {taskDataTyped.difficulty}
             </span>
             <span className="px-3 py-1 bg-orange-500/20 text-orange-300 text-sm rounded-full capitalize">
-              {taskData.category}
+              {taskDataTyped.category}
             </span>
           </div>
         </div>
@@ -208,8 +238,8 @@ function TaskPageContent() {
             question={questionText}
             value={code}
             onChange={setCode}
-            placeholder={`Write your solution in ${taskData.language}...`}
-            language={taskData.language}
+            placeholder={`Write your solution in ${taskDataTyped.language}...`}
+            language={taskDataTyped.language}
             isCode={true}
             height="calc(100vh - 250px)"
           />
@@ -223,12 +253,15 @@ function TaskPageContent() {
             </button>
             
             <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setCode(taskData.starterCode || '')}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-              >
-                Reset to Starter Code
-              </button>
+            <button
+              onClick={() => {
+                const starterCode = (taskData as { starterCode?: string | null })?.starterCode || ''
+                setCode(starterCode)
+              }}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Reset to Starter Code
+            </button>
               <button
                 onClick={handleSubmitCode}
                 disabled={!code.trim() || isSubmitting}
