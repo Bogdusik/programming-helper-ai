@@ -414,7 +414,22 @@ export default function ChatBox({ sessionId, taskId, onSessionCreated, onTaskCom
                   </span>
                 </div>
                 <p className="text-white/80 text-lg mb-4 leading-relaxed">{currentTask.description}</p>
-                <p className="text-white/50 text-sm">Work on this task with AI assistance. Ask questions, get hints, or request code reviews!</p>
+                <p className="text-white/50 text-sm mb-4">Work on this task with AI assistance. Ask questions, get hints, or request code reviews!</p>
+                {effectiveTaskId && (
+                  <button
+                    onClick={() => {
+                      window.location.href = `/task/${effectiveTaskId}`
+                    }}
+                    className="mt-4 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+                  >
+                    <div className="flex items-center justify-center space-x-2">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                      <span>Open Code Editor</span>
+                    </div>
+                  </button>
+                )}
               </div>
             ) : (
               // Default welcome message

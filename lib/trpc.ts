@@ -235,7 +235,7 @@ export const appRouter = router({
       .input(z.object({ 
         message: z.string()
           .min(1, "Message cannot be empty")
-          .max(2000, "Message too long (max 2000 characters)")
+          .max(10000, "Message too long (max 10000 characters)")
           .regex(/^[\s\S]*$/, "Invalid characters in message")
           .transform((msg) => msg.trim()),
         sessionId: z.string().optional()

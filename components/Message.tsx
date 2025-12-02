@@ -6,6 +6,81 @@ interface MessageProps {
   timestamp: Date
 }
 
+// Simple function to parse and render markdown code blocks
+function renderMessageContent(content: string, isUser: boolean) {
+  // Split content by code blocks
+  const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g
+  const parts: Array<{ type: 'text' | 'code'; content: string; language?: string }> = []
+  let lastIndex = 0
+  let match
+
+  while ((match = codeBlockRegex.exec(content)) !== null) {
+    // Add text before code block
+    if (match.index > lastIndex) {
+      const textContent = content.substring(lastIndex, match.index)
+      if (textContent.trim()) {
+        parts.push({ type: 'text', content: textContent })
+      }
+    }
+    
+    // Add code block
+    parts.push({
+      type: 'code',
+      content: match[2],
+      language: match[1] || 'text'
+    })
+    
+    lastIndex = codeBlockRegex.lastIndex
+  }
+  
+  // Add remaining text
+  if (lastIndex < content.length) {
+    const textContent = content.substring(lastIndex)
+    if (textContent.trim()) {
+      parts.push({ type: 'text', content: textContent })
+    }
+  }
+  
+  // If no code blocks found, return original content
+  if (parts.length === 0) {
+    return <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
+  }
+  
+  // Render parts
+  return (
+    <div className="space-y-2">
+      {parts.map((part, index) => {
+        if (part.type === 'code') {
+          return (
+            <div key={index} className={`rounded-lg overflow-hidden ${
+              isUser ? 'bg-black/30' : 'bg-black/20'
+            }`}>
+              {part.language && (
+                <div className={`px-3 py-1 text-xs font-mono ${
+                  isUser ? 'text-blue-200' : 'text-white/70'
+                } border-b border-white/10`}>
+                  {part.language}
+                </div>
+              )}
+              <pre className={`p-3 overflow-x-auto text-xs font-mono ${
+                isUser ? 'text-white' : 'text-white/90'
+              }`}>
+                <code>{part.content}</code>
+              </pre>
+            </div>
+          )
+        } else {
+          return (
+            <p key={index} className="text-sm leading-relaxed whitespace-pre-wrap">
+              {part.content}
+            </p>
+          )
+        }
+      })}
+    </div>
+  )
+}
+
 // OPTIMIZATION: Memoize Message component to prevent unnecessary re-renders
 const Message = memo(function Message({ role, content, timestamp }: MessageProps) {
   const isUser = role === 'user'
@@ -26,7 +101,7 @@ const Message = memo(function Message({ role, content, timestamp }: MessageProps
             </div>
           )}
           <div className="flex-1">
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
+            {renderMessageContent(content, isUser)}
             <p className={`text-xs mt-2 ${
               isUser ? 'text-blue-100' : 'text-white/50'
             }`}>

@@ -60,12 +60,12 @@ export default function CodeEditor({
   return (
     <div 
       id="code-editor-container"
-      className="flex border border-gray-300 rounded-lg overflow-hidden bg-white"
+      className="flex border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm"
       style={{ height }}
     >
       {/* Left side - Question/Description */}
       <div 
-        className="overflow-y-auto p-6 bg-gray-50 border-r border-gray-300"
+        className="overflow-y-auto p-4 sm:p-6 bg-gray-50 border-r border-gray-300"
         style={{ width: `${leftWidth}%` }}
       >
         <div className="prose prose-sm max-w-none">
@@ -102,12 +102,13 @@ export default function CodeEditor({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={`flex-1 w-full p-4 border-0 resize-none focus:outline-none ${
+          className={`flex-1 w-full p-4 sm:p-6 border-0 resize-none focus:outline-none ${
             isCode ? 'font-mono text-sm' : 'text-base'
           } text-gray-900 bg-white`}
           style={{ 
             fontFamily: isCode ? 'Monaco, "Courier New", monospace' : 'inherit',
-            lineHeight: isCode ? '1.5' : '1.6'
+            lineHeight: isCode ? '1.5' : '1.6',
+            tabSize: 2
           }}
         />
       </div>
