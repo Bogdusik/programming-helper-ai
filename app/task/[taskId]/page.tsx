@@ -34,7 +34,7 @@ function TaskPageContent() {
   
   const sendMessageMutation = trpc.chat.sendMessage.useMutation()
   const createSessionMutation = trpc.chat.createSession.useMutation()
-  const updateProgressMutation = trpc.task.updateProgress.useMutation()
+  const updateProgressMutation = trpc.task.updateTaskProgress.useMutation()
   
   // Initialize code with starter code if available
   useEffect(() => {
