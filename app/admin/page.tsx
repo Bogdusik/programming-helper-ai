@@ -2318,6 +2318,18 @@ function UserComparisonTab({
   maxImprovement: string
   onMaxImprovementChange: (val: string) => void
 }) {
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null)
+
+  const handleCopyUserId = async (userId: string) => {
+    try {
+      await navigator.clipboard.writeText(userId)
+      setCopiedUserId(userId)
+      toast.success('User ID copied to clipboard!')
+      setTimeout(() => setCopiedUserId(null), 2000)
+    } catch (error) {
+      toast.error('Failed to copy User ID')
+    }
+  }
   if (isLoading) {
     return (
       <div className="text-center py-12">
@@ -2395,7 +2407,30 @@ function UserComparisonTab({
           <tbody className="divide-y divide-white/10">
             {data.comparisons.map((comp, idx) => (
               <tr key={idx} className="hover:bg-white/5">
-                <td className="px-4 py-3 text-sm text-white font-mono">{comp.userId.slice(0, 8)}...</td>
+                <td className="px-4 py-3 text-sm">
+                  <div className="flex items-center gap-2 group relative">
+                    <span className="text-white font-mono cursor-default">{comp.userId.slice(0, 8)}...</span>
+                    <button
+                      onClick={() => handleCopyUserId(comp.userId)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded flex-shrink-0"
+                      title="Copy full User ID"
+                      aria-label="Copy User ID"
+                    >
+                      <svg className="w-4 h-4 text-white/70 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                    {copiedUserId === comp.userId && (
+                      <span className="absolute left-0 top-full mt-1 px-2 py-1 bg-green-500 text-white text-xs rounded whitespace-nowrap z-20 shadow-lg">
+                        Copied!
+                      </span>
+                    )}
+                    <div className="absolute left-0 bottom-full mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg border border-white/20">
+                      {comp.userId}
+                      <div className="absolute left-2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                    </div>
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-sm text-white">{comp.preScore}/{comp.preTotal} ({comp.prePercentage}%)</td>
                 <td className="px-4 py-3 text-sm text-white">{comp.postScore}/{comp.postTotal} ({comp.postPercentage}%)</td>
                 <td className={`px-4 py-3 text-sm font-semibold ${comp.improvement >= 0 ? 'text-green-400' : 'text-red-400'}`}>
