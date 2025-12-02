@@ -29,15 +29,15 @@ export default function Navbar() {
   const { data: userRole, error: roleError } = trpc.auth.getMyRole.useQuery(undefined, {
     enabled: isSignedIn,
     retry: false,
-    refetchOnWindowFocus: false,
-    // Don't log UNAUTHORIZED errors as they're expected for unregistered users
-    onError: (error) => {
-      // Only log non-UNAUTHORIZED errors
-      if (error.data?.code !== 'UNAUTHORIZED') {
-        console.error('Error fetching user role:', error)
-      }
-    }
+    refetchOnWindowFocus: false
   })
+  
+  // Handle errors - don't log UNAUTHORIZED errors as they're expected for unregistered users
+  useEffect(() => {
+    if (roleError && roleError.data?.code !== 'UNAUTHORIZED') {
+      console.error('Error fetching user role:', roleError)
+    }
+  }, [roleError])
   
   const isAdmin = user?.publicMetadata?.role === 'admin' || userRole?.role === 'admin'
 
