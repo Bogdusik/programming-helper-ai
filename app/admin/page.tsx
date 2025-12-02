@@ -2005,6 +2005,82 @@ function ExportModal({ isOpen, onClose, format, onFormatChange }: {
   )
 }
 
+// Types for Assessment Analysis
+type AssessmentOverviewData = {
+  totalPreAssessments: number
+  totalPostAssessments: number
+  usersWithPre: number
+  usersWithPost: number
+  usersWithBoth: number
+  completionRate: number
+  avgPreScore: number
+  avgPostScore: number
+  avgImprovement: number
+  avgConfidenceChange: number
+  improvementDistribution: {
+    improved: number
+    noChange: number
+    declined: number
+    total: number
+  }
+}
+
+type UserComparison = {
+  userId: string
+  preScore: number
+  preTotal: number
+  prePercentage: number
+  preConfidence: number
+  postScore: number
+  postTotal: number
+  postPercentage: number
+  postConfidence: number
+  improvement: number
+  confidenceChange: number
+  daysBetween: number
+  language: string | null
+  assessedLevel: string | null
+  preCompletedAt: string | Date
+  postCompletedAt: string | Date
+}
+
+type UserComparisonData = {
+  comparisons: UserComparison[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}
+
+type CategoryStat = {
+  category: string
+  totalQuestions: number
+  avgPreAccuracy: number
+  avgPostAccuracy: number
+  avgImprovement: number
+}
+
+type QuestionInsight = {
+  questionId: string
+  category: string
+  difficulty: string
+  language: string | null
+  preCorrect: number
+  preTotal: number
+  postCorrect: number
+  postTotal: number
+  preAccuracy: number
+  postAccuracy: number
+  improvement: number
+}
+
+type QuestionInsightsData = {
+  questionInsights: QuestionInsight[]
+  categoryStats: CategoryStat[]
+}
+
 // Assessment Analysis Modal Component
 function AssessmentAnalysisModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'questions' | 'visualizations'>('overview')
@@ -2105,7 +2181,7 @@ function AssessmentAnalysisModal({ isOpen, onClose }: { isOpen: boolean; onClose
 }
 
 // Overview Tab Component
-function OverviewTab({ data, isLoading }: { data: any; isLoading: boolean }) {
+function OverviewTab({ data, isLoading }: { data: AssessmentOverviewData | undefined; isLoading: boolean }) {
   if (isLoading) {
     return (
       <div className="text-center py-12">
@@ -2231,7 +2307,7 @@ function UserComparisonTab({
   maxImprovement,
   onMaxImprovementChange,
 }: {
-  data: any
+  data: UserComparisonData | undefined
   isLoading: boolean
   page: number
   onPageChange: (page: number) => void
@@ -2317,7 +2393,7 @@ function UserComparisonTab({
             </tr>
           </thead>
           <tbody className="divide-y divide-white/10">
-            {data.comparisons.map((comp: any, idx: number) => (
+            {data.comparisons.map((comp, idx) => (
               <tr key={idx} className="hover:bg-white/5">
                 <td className="px-4 py-3 text-sm text-white font-mono">{comp.userId.slice(0, 8)}...</td>
                 <td className="px-4 py-3 text-sm text-white">{comp.preScore}/{comp.preTotal} ({comp.prePercentage}%)</td>
@@ -2368,7 +2444,7 @@ function UserComparisonTab({
 }
 
 // Question Insights Tab Component
-function QuestionInsightsTab({ data, isLoading }: { data: any; isLoading: boolean }) {
+function QuestionInsightsTab({ data, isLoading }: { data: QuestionInsightsData | undefined; isLoading: boolean }) {
   if (isLoading) {
     return (
       <div className="text-center py-12">
@@ -2393,7 +2469,7 @@ function QuestionInsightsTab({ data, isLoading }: { data: any; isLoading: boolea
         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
           <h3 className="text-white font-semibold mb-4">Improvement by Category</h3>
           <div className="space-y-3">
-            {data.categoryStats.map((cat: any, idx: number) => (
+            {data.categoryStats.map((cat, idx) => (
               <div key={idx} className="space-y-1">
                 <div className="flex justify-between items-center">
                   <span className="text-white capitalize font-medium">{cat.category}</span>
@@ -2425,7 +2501,7 @@ function QuestionInsightsTab({ data, isLoading }: { data: any; isLoading: boolea
         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
           <h3 className="text-white font-semibold mb-4">Top Improved Questions</h3>
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {data.questionInsights.slice(0, 10).map((q: any, idx: number) => (
+            {data.questionInsights.slice(0, 10).map((q, idx) => (
               <div key={idx} className="bg-white/5 rounded p-3 border border-white/10">
                 <div className="flex justify-between items-start mb-2">
                   <div>
@@ -2453,9 +2529,9 @@ function QuestionInsightsTab({ data, isLoading }: { data: any; isLoading: boolea
 
 // Visualizations Tab Component
 function VisualizationsTab({ overviewData, userComparisonData, questionInsightsData }: {
-  overviewData: any
-  userComparisonData: any
-  questionInsightsData: any
+  overviewData: AssessmentOverviewData | undefined
+  userComparisonData: UserComparisonData | undefined
+  questionInsightsData: QuestionInsightsData | undefined
 }) {
   if (!overviewData && !userComparisonData && !questionInsightsData) {
     return (
@@ -2515,7 +2591,7 @@ function VisualizationsTab({ overviewData, userComparisonData, questionInsightsD
         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
           <h3 className="text-white font-semibold mb-4">Pre vs Post Score Comparison</h3>
           <div className="h-64 flex items-end justify-between gap-1 overflow-x-auto">
-            {userComparisonData.comparisons.slice(0, 20).map((comp: any, idx: number) => {
+            {userComparisonData.comparisons.slice(0, 20).map((comp, idx) => {
               const maxScore = 100
               const preHeight = (comp.prePercentage / maxScore) * 100
               const postHeight = (comp.postPercentage / maxScore) * 100
@@ -2557,8 +2633,8 @@ function VisualizationsTab({ overviewData, userComparisonData, questionInsightsD
         <div className="bg-white/5 rounded-lg p-4 border border-white/10">
           <h3 className="text-white font-semibold mb-4">Category Improvement</h3>
           <div className="space-y-3">
-            {questionInsightsData.categoryStats.map((cat: any, idx: number) => {
-              const improvements = questionInsightsData.categoryStats.map((c: any) => Math.abs(c.avgImprovement))
+            {questionInsightsData.categoryStats.map((cat, idx) => {
+              const improvements = questionInsightsData.categoryStats.map((c) => Math.abs(c.avgImprovement))
               const maxImprovement = improvements.length > 0 ? Math.max(...improvements, 1) : 1
               const barWidth = maxImprovement > 0 ? (Math.abs(cat.avgImprovement) / maxImprovement) * 100 : 0
               return (
