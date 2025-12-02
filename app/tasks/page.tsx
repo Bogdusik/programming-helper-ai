@@ -430,28 +430,17 @@ function TasksPageContent() {
                     <div className="flex flex-col sm:flex-row gap-2">
                       {status === 'not_started' && (
                         <button
-                          onClick={() => handleStartTask(task)}
-                          disabled={startingTaskId === task.id}
-                          className="w-full sm:flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap text-sm font-medium"
+                          onClick={() => router.push(`/task/${task.id}`)}
+                          className="w-full sm:flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap text-sm font-medium"
                         >
-                          {startingTaskId === task.id ? 'Starting...' : 'Start Task'}
+                          Start Task
                         </button>
                       )}
                       {inProgress && (
                         <>
                           <button
-                            onClick={async () => {
-                              const progress = task.userProgress?.[0]
-                              if (progress?.chatSessionId) {
-                                // Navigate to existing session WITHOUT taskId to avoid auto-sending message
-                                router.push(`/chat?sessionId=${progress.chatSessionId}`)
-                              } else {
-                                // If no session exists, create one
-                                await handleStartTask(task)
-                              }
-                            }}
-                            disabled={startingTaskId === task.id}
-                            className="w-full sm:flex-1 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap text-sm font-medium"
+                            onClick={() => router.push(`/task/${task.id}`)}
+                            className="w-full sm:flex-1 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors whitespace-nowrap text-sm font-medium"
                           >
                             Continue Task
                           </button>

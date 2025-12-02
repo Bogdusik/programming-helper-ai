@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import CodeEditor from './CodeEditor'
 
 interface AssessmentModalProps {
   isOpen: boolean
@@ -117,9 +118,14 @@ export default function AssessmentModal({
 
   if (!isOpen || questions.length === 0 || !question) return null
 
+  // Check if current question requires code editor (split view)
+  const needsCodeEditor = question.type === 'code_snippet' || question.type === 'conceptual'
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div className={`bg-white rounded-lg shadow-xl w-full max-h-[95vh] overflow-hidden flex flex-col ${
+        needsCodeEditor ? 'max-w-7xl' : 'max-w-3xl'
+      }`}>
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-2xl font-bold text-gray-900">
@@ -138,71 +144,77 @@ export default function AssessmentModal({
           </div>
         </div>
 
-        <div className="p-6">
-          <div className="mb-6">
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">
-                {question.category}
-              </span>
-              <span className="px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-800">
-                {question.difficulty}
-              </span>
+        <div className={`flex-1 flex flex-col overflow-hidden ${needsCodeEditor ? 'p-0' : 'p-6'}`}>
+          {needsCodeEditor ? (
+            // Split view for code/conceptual questions
+            <div className="flex-1 flex flex-col">
+              <div className="px-6 pt-4 pb-2 border-b border-gray-200">
+                <div className="flex items-center space-x-2 mb-2">
+                  <span className="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">
+                    {question.category}
+                  </span>
+                  <span className="px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-800">
+                    {question.difficulty}
+                  </span>
+                </div>
+              </div>
+              <div className="flex-1 p-6">
+                <CodeEditor
+                  question={question.question}
+                  value={answers[question.id] || ''}
+                  onChange={(value) => handleAnswer(value)}
+                  placeholder={question.type === 'code_snippet' ? 'Enter your code here...' : 'Enter your answer here...'}
+                  language={language}
+                  isCode={question.type === 'code_snippet'}
+                  height="calc(95vh - 280px)"
+                />
+              </div>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">
-              {question.question}
-            </h3>
-
-            {question.type === 'multiple_choice' && question.options && (
-              <div className="space-y-3">
-                {question.options.map((option, index) => (
-                  <label
-                    key={index}
-                    className={`flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                      answers[question.id] === option
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`question-${question.id}`}
-                      value={option}
-                      checked={answers[question.id] === option}
-                      onChange={(e) => handleAnswer(e.target.value)}
-                      className="mt-1 w-4 h-4 text-blue-600"
-                    />
-                    <span className="text-gray-700 flex-1">{option}</span>
-                  </label>
-                ))}
+          ) : (
+            // Standard view for multiple choice questions
+            <div className="mb-6">
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">
+                  {question.category}
+                </span>
+                <span className="px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-800">
+                  {question.difficulty}
+                </span>
               </div>
-            )}
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                {question.question}
+              </h3>
 
-            {question.type === 'code_snippet' && (
-              <div className="space-y-3">
-                <textarea
-                  value={answers[question.id] || ''}
-                  onChange={(e) => handleAnswer(e.target.value)}
-                  placeholder="Enter your code answer here..."
-                  className="w-full h-32 p-3 border-2 border-gray-200 rounded-lg font-mono text-sm text-gray-900 focus:border-blue-600 focus:outline-none"
-                />
-              </div>
-            )}
-
-            {question.type === 'conceptual' && (
-              <div className="space-y-3">
-                <textarea
-                  value={answers[question.id] || ''}
-                  onChange={(e) => handleAnswer(e.target.value)}
-                  placeholder="Enter your answer here..."
-                  className="w-full h-32 p-3 border-2 border-gray-200 rounded-lg text-gray-900 focus:border-blue-600 focus:outline-none"
-                />
-              </div>
-            )}
-          </div>
+              {question.type === 'multiple_choice' && question.options && (
+                <div className="space-y-3">
+                  {question.options.map((option, index) => (
+                    <label
+                      key={index}
+                      className={`flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                        answers[question.id] === option
+                          ? 'border-blue-600 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`question-${question.id}`}
+                        value={option}
+                        checked={answers[question.id] === option}
+                        onChange={(e) => handleAnswer(e.target.value)}
+                        className="mt-1 w-4 h-4 text-blue-600"
+                      />
+                      <span className="text-gray-700 flex-1">{option}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Confidence rating (only on last question) */}
           {currentQuestion === questions.length - 1 && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <div className={`p-4 bg-gray-50 border-t border-gray-200 ${needsCodeEditor ? 'mx-6 mb-0' : 'mb-6 rounded-lg'}`}>
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 How confident are you with your answers overall?
               </label>
@@ -229,7 +241,7 @@ export default function AssessmentModal({
             </div>
           )}
 
-          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+          <div className={`flex items-center justify-between pt-4 border-t border-gray-200 ${needsCodeEditor ? 'px-6' : ''}`}>
             <button
               type="button"
               onClick={handlePrevious}
