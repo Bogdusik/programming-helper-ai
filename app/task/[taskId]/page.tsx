@@ -246,8 +246,8 @@ function TaskPageContent() {
       <Navbar />
       <MinimalBackground />
       
-      <div className="container mx-auto px-4 py-4 sm:py-6 max-w-7xl flex-1 flex flex-col min-h-0">
-        <div className="mb-4 flex items-center justify-between flex-wrap gap-4 flex-shrink-0">
+      <div className="container mx-auto px-4 py-3 sm:py-4 max-w-7xl flex-1 flex flex-col min-h-0">
+        <div className="mb-3 flex items-center justify-between flex-wrap gap-3 flex-shrink-0">
           <button
             onClick={() => router.push('/tasks')}
             className="text-white/70 hover:text-white flex items-center space-x-2 transition-colors"
@@ -271,7 +271,7 @@ function TaskPageContent() {
           </div>
         </div>
         
-        <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-4 sm:p-6 mb-4 flex-1 flex flex-col min-h-0">
+        <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-3 sm:p-4 mb-3 flex-1 flex flex-col min-h-0">
           <CodeEditor
             question={questionText}
             value={code}
@@ -283,7 +283,7 @@ function TaskPageContent() {
           />
         </div>
         
-        <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-4 sm:p-6 mb-4 flex-shrink-0">
+        <div className="bg-white/10 backdrop-blur-lg rounded-lg border border-white/20 p-3 sm:p-4 mb-3 flex-shrink-0">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <button
               onClick={handleContinueInChat}
