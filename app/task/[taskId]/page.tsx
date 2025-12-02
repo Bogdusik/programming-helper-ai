@@ -246,8 +246,8 @@ function TaskPageContent() {
       <Navbar />
       <MinimalBackground />
       
-      <div className="container mx-auto px-4 max-w-7xl flex-1 flex flex-col">
-        <div className="mb-4 flex items-center justify-between flex-wrap gap-2 flex-shrink-0 pt-8 mt-4">
+      <div className="container mx-auto px-4 max-w-7xl flex-1 flex flex-col justify-center">
+        <div className="mb-4 flex items-center justify-between flex-wrap gap-2 flex-shrink-0">
           <button
             onClick={() => router.push('/tasks')}
             className="text-white/70 hover:text-white flex items-center space-x-2 transition-colors"
