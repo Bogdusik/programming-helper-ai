@@ -1205,14 +1205,51 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const { taskId, ...updateData } = input
 
+        // Prepare data object, handling null values for arrays
+        const data: {
+          title?: string
+          description?: string
+          language?: string
+          difficulty?: string
+          category?: string
+          starterCode?: string | null
+          hints?: string[]
+          solution?: string | null
+          testCases?: unknown
+          examples?: unknown
+          constraints?: string[]
+          isActive?: boolean
+        } = {}
+
+        // Only include fields that are actually provided (not undefined)
+        if (updateData.title !== undefined) data.title = updateData.title
+        if (updateData.description !== undefined) data.description = updateData.description
+        if (updateData.starterCode !== undefined) data.starterCode = updateData.starterCode
+        if (updateData.hints !== undefined) data.hints = updateData.hints
+        if (updateData.solution !== undefined) data.solution = updateData.solution
+        if (updateData.testCases !== undefined) data.testCases = updateData.testCases
+        if (updateData.examples !== undefined) data.examples = updateData.examples
+        if (updateData.isActive !== undefined) data.isActive = updateData.isActive
+        
+        // Handle constraints: null means set to empty array, undefined means don't update
+        if (updateData.constraints !== undefined) {
+          data.constraints = updateData.constraints ?? []
+        }
+
+        // Handle language, difficulty, category with lowercase conversion
+        if (updateData.language) {
+          data.language = updateData.language.toLowerCase()
+        }
+        if (updateData.difficulty) {
+          data.difficulty = updateData.difficulty.toLowerCase()
+        }
+        if (updateData.category) {
+          data.category = updateData.category.toLowerCase()
+        }
+
         const task = await db.programmingTask.update({
           where: { id: taskId },
-          data: {
-            ...updateData,
-            ...(updateData.language && { language: updateData.language.toLowerCase() }),
-            ...(updateData.difficulty && { difficulty: updateData.difficulty.toLowerCase() }),
-            ...(updateData.category && { category: updateData.category.toLowerCase() }),
-          },
+          data,
         })
 
         logger.info('Task updated', ctx.user.id, { taskId: task.id })
