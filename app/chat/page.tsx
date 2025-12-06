@@ -172,18 +172,21 @@ function ChatPageContent() {
   // Handle task initialization when coming from tasks page
   useEffect(() => {
     if (sessionIdFromUrl) {
-      setCurrentSessionId(sessionIdFromUrl)
-      // Reset task initialization state when switching sessions
-      setTaskInitialized(false)
+      // Only reset if session actually changed
+      if (currentSessionId !== sessionIdFromUrl) {
+        setCurrentSessionId(sessionIdFromUrl)
+        // Reset task initialization state only when session changes
+        setTaskInitialized(false)
+      }
     } else if (!sessionIdFromUrl && currentSessionId) {
       // Clear session if no sessionId in URL
       setCurrentSessionId(undefined)
       setTaskInitialized(false)
     }
-  }, [sessionIdFromUrl])
+  }, [sessionIdFromUrl, currentSessionId])
 
   // Check if session has messages to determine if it's a new or existing session
-  const { data: existingMessages, isLoading: isLoadingMessages } = trpc.chat.getMessages.useQuery(
+  const { data: existingMessages, isLoading: isLoadingMessages, refetch: refetchMessages } = trpc.chat.getMessages.useQuery(
     { sessionId: currentSessionId },
     { enabled: !!currentSessionId && isSignedIn && hasCheckedUserExists && !isCheckingUserExists }
   )
@@ -216,42 +219,57 @@ function ChatPageContent() {
       setTaskInitialized(true)
       
       // Add a small delay to ensure everything is fully loaded and rendered
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
         // Double-check that messages are still empty (session wasn't populated in the meantime)
-        if (existingMessages.length === 0) {
-          // Only send message if this is a new task start (both taskId and sessionId in URL, and no messages)
-          const taskMessage = `I want to work on this task:\n\n**${taskData.title}**\n\n${taskData.description}\n\nLanguage: ${taskData.language}\nDifficulty: ${taskData.difficulty}\n\nPlease help me solve this task.`
+        // Refetch messages to ensure we have the latest state
+        try {
+          const latestMessages = await utils.chat.getMessages.fetch({ 
+            sessionId: currentSessionId 
+          })
           
-          // Use mutateAsync to avoid complex type inference in dependencies
-          sendMessageMutation.mutateAsync({
-            message: taskMessage,
-            sessionId: currentSessionId,
-          }).then((result) => {
-            // If a new session was created (session was missing), update currentSessionId
-            if (result.sessionId && result.sessionId !== currentSessionId) {
-              setCurrentSessionId(result.sessionId)
-              // Update task progress with new session ID
-              if (taskId) {
-                updateProgressMutation.mutate({
-                  taskId: taskId,
-                  chatSessionId: result.sessionId,
-                })
+          if (latestMessages && latestMessages.length === 0) {
+            // Only send message if this is a new task start (both taskId and sessionId in URL, and no messages)
+            const taskMessage = `I want to work on this task:\n\n**${taskData.title}**\n\n${taskData.description}\n\nLanguage: ${taskData.language}\nDifficulty: ${taskData.difficulty}\n\nPlease help me solve this task.`
+            
+            // Use mutateAsync to avoid complex type inference in dependencies
+            sendMessageMutation.mutateAsync({
+              message: taskMessage,
+              sessionId: currentSessionId,
+            }).then((result) => {
+              // If a new session was created (session was missing), update currentSessionId
+              if (result.sessionId && result.sessionId !== currentSessionId) {
+                setCurrentSessionId(result.sessionId)
+                // Update task progress with new session ID
+                if (taskId) {
+                  updateProgressMutation.mutate({
+                    taskId: taskId,
+                    chatSessionId: result.sessionId,
+                  })
+                }
               }
-            }
-            // Remove taskId from URL after initialization
+              // Remove taskId from URL after initialization
+              const newUrl = new URL(window.location.href)
+              newUrl.searchParams.delete('taskId')
+              router.replace(newUrl.pathname + newUrl.search)
+            }).catch((error) => {
+              console.error('Error sending task message:', error)
+              // Reset initialization state on error so user can retry
+              setTaskInitialized(false)
+            })
+          } else {
+            // Messages appeared in the meantime, mark as initialized
+            setTaskInitialized(true)
+            // Remove taskId from URL since session already has messages
             const newUrl = new URL(window.location.href)
             newUrl.searchParams.delete('taskId')
             router.replace(newUrl.pathname + newUrl.search)
-          }).catch((error) => {
-            console.error('Error sending task message:', error)
-            // Reset initialization state on error so user can retry
-            setTaskInitialized(false)
-          })
-        } else {
-          // Messages appeared in the meantime, mark as initialized
+          }
+        } catch (error) {
+          console.error('Error checking messages:', error)
+          // On error, mark as initialized to prevent infinite retries
           setTaskInitialized(true)
         }
-      }, 300) // Wait 300ms for session to be fully ready and rendered
+      }, 500) // Wait 500ms for session to be fully ready and rendered
       
       return () => clearTimeout(timer)
     } else if (taskId && !taskInitialized && !isLoadingMessages && existingMessages !== undefined) {
@@ -259,7 +277,7 @@ function ChatPageContent() {
       // Only mark as initialized if messages are loaded (not loading) and we've checked them
       setTaskInitialized(true)
     }
-  }, [taskData?.id, currentSessionId, taskInitialized, isSignedIn, taskId, sessionIdFromUrl, existingMessages, isLoadingMessages, sendMessageMutation, updateProgressMutation, router])
+  }, [taskData?.id, currentSessionId, taskInitialized, isSignedIn, taskId, sessionIdFromUrl, existingMessages, isLoadingMessages, sendMessageMutation, updateProgressMutation, router, utils])
 
   // Separate useEffect specifically for Research Consent - highest priority
   // This runs independently to ensure it shows immediately for new users

@@ -27,6 +27,7 @@ function TaskPageContent() {
   
   const [code, setCode] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCreatingSession, setIsCreatingSession] = useState(false)
   
   const { data: taskData, isLoading: isLoadingTask } = trpc.task.getTask.useQuery(
     { taskId: taskId!, includeProgress: true },
@@ -36,6 +37,7 @@ function TaskPageContent() {
   const sendMessageMutation = trpc.chat.sendMessage.useMutation()
   const createSessionMutation = trpc.chat.createSession.useMutation()
   const updateProgressMutation = trpc.task.updateTaskProgress.useMutation()
+  const utils = trpc.useUtils()
   
   // Initialize code with starter code if available
   useEffect(() => {
@@ -133,9 +135,11 @@ function TaskPageContent() {
   }
   
   const handleContinueInChat = async () => {
-    if (!taskData) return
+    if (!taskData || isCreatingSession) return
     
     try {
+      setIsCreatingSession(true)
+      
       // Use type assertion to avoid deep type recursion
       type TaskDataSimple = {
         id: string
@@ -148,32 +152,53 @@ function TaskPageContent() {
       const progress = taskDataSimple.userProgress?.[0]
       let sessionId: string | undefined
       
+      // Check if there's an existing session with messages
       if (progress?.chatSessionId) {
-        sessionId = progress.chatSessionId
-      } else {
-        const session = await createSessionMutation.mutateAsync({
-          title: `Task: ${taskDataSimple.title}`,
-        })
-        sessionId = session.id
-        
-        // Update task progress with session ID and set status to in_progress
+        // Verify session exists and has messages before reusing
         try {
-          await updateProgressMutation.mutateAsync({
-            taskId: taskDataSimple.id,
-            status: 'in_progress',
-            chatSessionId: sessionId,
+          const sessionMessages = await utils.chat.getMessages.fetch({ 
+            sessionId: progress.chatSessionId 
           })
+          
+          // Only reuse if session has messages (it's been used)
+          if (sessionMessages && sessionMessages.length > 0) {
+            sessionId = progress.chatSessionId
+            // Navigate without taskId to avoid re-initialization
+            router.push(`/chat?sessionId=${sessionId}`)
+            setIsCreatingSession(false)
+            return
+          }
         } catch (error) {
-          console.error('Error updating task progress:', error)
-          // Continue anyway - session is created
+          // If we can't check, assume session is empty and create new one
+          console.warn('Could not verify session, creating new one:', error)
         }
       }
       
-      // Navigate to chat with sessionId and taskId
+      // Create new session if no valid existing session
+      const session = await createSessionMutation.mutateAsync({
+        title: `Task: ${taskDataSimple.title}`,
+      })
+      sessionId = session.id
+      
+      // Update task progress with session ID and set status to in_progress
+      try {
+        await updateProgressMutation.mutateAsync({
+          taskId: taskDataSimple.id,
+          status: 'in_progress',
+          chatSessionId: sessionId,
+        })
+      } catch (error) {
+        console.error('Error updating task progress:', error)
+        // Continue anyway - session is created
+      }
+      
+      // Navigate to chat with sessionId and taskId for initialization
       router.push(`/chat?sessionId=${sessionId}&taskId=${taskDataSimple.id}`)
     } catch (error) {
       console.error('Error opening chat:', error)
       toast.error('Failed to open chat. Please try again.')
+    } finally {
+      setIsCreatingSession(false)
     }
   }
   
