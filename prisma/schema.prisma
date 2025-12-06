@@ -16,26 +16,26 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Profile fields
-  selfReportedLevel    String?   // "beginner", "intermediate", "advanced", "expert"
-  assessedLevel        String?   // level after pre-assessment
-  learningGoals        String[]  // array of learning goals
-  aiExperience         String?   // experience with AI assistants
-  initialConfidence    Int?      // 1-5 scale
-  preferredLanguages   String[]  @default([]) // array of selected languages
-  primaryLanguage      String?   // main language
-  onboardingCompleted  Boolean   @default(false)
-  onboardingStep      Int       @default(0)
-  showTooltips         Boolean   @default(true)
-  profileCompleted     Boolean   @default(false)
+  selfReportedLevel   String? // "beginner", "intermediate", "advanced", "expert"
+  assessedLevel       String? // level after pre-assessment
+  learningGoals       String[] // array of learning goals
+  aiExperience        String? // experience with AI assistants
+  initialConfidence   Int? // 1-5 scale
+  preferredLanguages  String[] @default([]) // array of selected languages
+  primaryLanguage     String? // main language
+  onboardingCompleted Boolean  @default(false)
+  onboardingStep      Int      @default(0)
+  showTooltips        Boolean  @default(true)
+  profileCompleted    Boolean  @default(false)
 
   // Relations
-  messages          Message[]
-  chatSessions      ChatSession[]
-  stats             Stats?
-  profile           UserProfile?
-  assessments       Assessment[]
-  languageProgress  LanguageProgress[]
-  taskProgress      UserTaskProgress[]
+  messages         Message[]
+  chatSessions     ChatSession[]
+  stats            Stats?
+  profile          UserProfile?
+  assessments      Assessment[]
+  languageProgress LanguageProgress[]
+  taskProgress     UserTaskProgress[]
 
   @@map("users")
 }
@@ -56,16 +56,16 @@ model ChatSession {
 }
 
 model Message {
-  id        String   @id @default(cuid())
-  userId    String
+  id            String   @id @default(cuid())
+  userId        String
   chatSessionId String?
-  role      String   // "user" or "assistant"
-  content   String
-  questionType String? // Cached question type for user messages to avoid re-analysis
-  timestamp DateTime @default(now())
+  role          String // "user" or "assistant"
+  content       String
+  questionType  String? // Cached question type for user messages to avoid re-analysis
+  timestamp     DateTime @default(now())
 
   // Relations
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   chatSession ChatSession? @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
 
   // Indexes for better performance
@@ -77,18 +77,18 @@ model Message {
 }
 
 model Stats {
-  id                        String   @id @default(cuid())
-  userId                    String   @unique
-  questionsAsked            Int      @default(0)
-  avgResponseTime           Float    @default(0)
-  mostFrequentResponseType  String?  // Could be "code", "explanation", "debug", etc.
-  totalTimeSpent            Int      @default(0) // in seconds
-  tasksCompleted            Int      @default(0)
-  averageQuestionsPerTask   Float?
-  languagesUsed             String[]
-  improvementScore          Float?   // difference between pre/post assessment
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  id                       String   @id @default(cuid())
+  userId                   String   @unique
+  questionsAsked           Int      @default(0)
+  avgResponseTime          Float    @default(0)
+  mostFrequentResponseType String? // Could be "code", "explanation", "debug", etc.
+  totalTimeSpent           Int      @default(0) // in seconds
+  tasksCompleted           Int      @default(0)
+  averageQuestionsPerTask  Float?
+  languagesUsed            String[]
+  improvementScore         Float? // difference between pre/post assessment
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -97,14 +97,14 @@ model Stats {
 }
 
 model UserProfile {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  experience    String?  // "complete_beginner", "beginner", "intermediate", "advanced", "expert"
-  focusAreas    String[] // what they want to focus on
-  confidence    Int?     // 1-5 scale
-  aiExperience  String?  // "frequent", "occasional", "never"
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  experience   String? // "complete_beginner", "beginner", "intermediate", "advanced", "expert"
+  focusAreas   String[] // what they want to focus on
+  confidence   Int? // 1-5 scale
+  aiExperience String? // "frequent", "occasional", "never"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -113,16 +113,16 @@ model UserProfile {
 }
 
 model Assessment {
-  id            String   @id @default(cuid())
-  userId        String
-  type          String   // "pre" or "post"
-  language      String?  // selected programming language
-  score         Int?     // number of correct answers
-  totalQuestions Int     @default(0)
-  confidence    Int      // self-assessment 1-5
-  answers       Json     // detailed answers to questions
-  completedAt   DateTime @default(now())
-  createdAt     DateTime @default(now())
+  id             String   @id @default(cuid())
+  userId         String
+  type           String // "pre" or "post"
+  language       String? // selected programming language
+  score          Int? // number of correct answers
+  totalQuestions Int      @default(0)
+  confidence     Int // self-assessment 1-5
+  answers        Json // detailed answers to questions
+  completedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -134,13 +134,13 @@ model Assessment {
 model AssessmentQuestion {
   id            String   @id @default(cuid())
   question      String
-  type          String   // "multiple_choice", "code_snippet", "conceptual"
-  options       Json?    // for multiple choice
+  type          String // "multiple_choice", "code_snippet", "conceptual"
+  options       Json? // for multiple choice
   correctAnswer String
-  category      String   // "syntax", "logic", "algorithms", "data_structures", "debugging"
-  difficulty    String   // "beginner", "intermediate", "advanced"
-  language      String?  // specific language or "general"
-  explanation   String?  // explanation of correct answer
+  category      String // "syntax", "logic", "algorithms", "data_structures", "debugging"
+  difficulty    String // "beginner", "intermediate", "advanced"
+  language      String? // specific language or "general"
+  explanation   String? // explanation of correct answer
   createdAt     DateTime @default(now())
 
   @@index([difficulty, language])
@@ -149,14 +149,14 @@ model AssessmentQuestion {
 }
 
 model LanguageProgress {
-  id            String   @id @default(cuid())
-  userId        String
-  language      String
-  questionsAsked Int     @default(0)
-  tasksCompleted Int     @default(0)
-  lastUsedAt    DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String    @id @default(cuid())
+  userId         String
+  language       String
+  questionsAsked Int       @default(0)
+  tasksCompleted Int       @default(0)
+  lastUsedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -167,22 +167,24 @@ model LanguageProgress {
 }
 
 model ProgrammingTask {
-  id            String   @id @default(cuid())
-  title         String
-  description   String
-  language      String
-  difficulty    String   // "beginner", "intermediate", "advanced"
-  category      String   // "algorithms", "data_structures", "syntax", "debugging", etc.
-  starterCode   String?  // initial code for the task
-  hints         String[] // array of hints
-  solution      String?  // correct solution (for comparison)
-  testCases     Json?    // test cases for validation
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  language    String
+  difficulty  String // "beginner", "intermediate", "advanced"
+  category    String // "algorithms", "data_structures", "syntax", "debugging", etc.
+  starterCode String? // initial code for the task
+  hints       String[] // array of hints
+  solution    String? // correct solution (for comparison)
+  testCases   Json? // test cases for validation
+  examples    Json? // array of examples with input, output, and explanation
+  constraints String[] // array of constraints (e.g., "2 <= nums.length <= 10^4")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  userProgress  UserTaskProgress[]
+  userProgress UserTaskProgress[]
 
   @@index([language, difficulty])
   @@index([category])
@@ -190,18 +192,18 @@ model ProgrammingTask {
 }
 
 model UserTaskProgress {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   userId        String
   taskId        String
-  status        String   @default("not_started") // "not_started", "in_progress", "completed"
-  attempts      Int      @default(0)
+  status        String    @default("not_started") // "not_started", "in_progress", "completed"
+  attempts      Int       @default(0)
   completedAt   DateTime?
-  chatSessionId String?  // link to chat session for this task
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  chatSessionId String? // link to chat session for this task
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   task ProgrammingTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([userId, taskId])

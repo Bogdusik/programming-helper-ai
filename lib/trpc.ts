@@ -1168,6 +1168,8 @@ export const appRouter = router({
         hints: z.array(z.string()).optional(),
         solution: z.string().optional(),
         testCases: z.any().optional(),
+        examples: z.any().optional(),
+        constraints: z.array(z.string()).optional(),
         isActive: z.boolean().default(true),
       }))
       .mutation(async ({ input, ctx }) => {
@@ -1196,6 +1198,8 @@ export const appRouter = router({
         hints: z.array(z.string()).optional(),
         solution: z.string().optional().nullable(),
         testCases: z.any().optional().nullable(),
+        examples: z.any().optional().nullable(),
+        constraints: z.array(z.string()).optional().nullable(),
         isActive: z.boolean().optional(),
       }))
       .mutation(async ({ input, ctx }) => {
