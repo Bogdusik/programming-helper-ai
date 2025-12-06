@@ -308,6 +308,8 @@ export async function POST() {
           "hints" TEXT[] DEFAULT ARRAY[]::TEXT[],
           "solution" TEXT,
           "testCases" JSONB,
+          "examples" JSONB,
+          "constraints" TEXT[] DEFAULT ARRAY[]::TEXT[],
           "isActive" BOOLEAN NOT NULL DEFAULT true,
           "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -429,6 +431,34 @@ export async function POST() {
               results.addedColumns.push('messages.questionType')
             } catch (error) {
               results.errors.push(`Failed to add questionType to messages: ${error instanceof Error ? error.message : 'Unknown'}`)
+            }
+          }
+        }
+        
+        // Check for missing columns in programming_tasks table
+        if (table.name === 'programming_tasks') {
+          const taskColumns = await db.$queryRaw<Array<{ column_name: string }>>`
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'programming_tasks'
+          `
+          const taskColumnNames = taskColumns.map(c => c.column_name)
+          
+          if (!taskColumnNames.includes('examples')) {
+            try {
+              await db.$executeRawUnsafe(`ALTER TABLE "programming_tasks" ADD COLUMN IF NOT EXISTS "examples" JSONB`)
+              results.addedColumns.push('programming_tasks.examples')
+            } catch (error) {
+              results.errors.push(`Failed to add examples to programming_tasks: ${error instanceof Error ? error.message : 'Unknown'}`)
+            }
+          }
+          
+          if (!taskColumnNames.includes('constraints')) {
+            try {
+              await db.$executeRawUnsafe(`ALTER TABLE "programming_tasks" ADD COLUMN IF NOT EXISTS "constraints" TEXT[] DEFAULT ARRAY[]::TEXT[]`)
+              results.addedColumns.push('programming_tasks.constraints')
+            } catch (error) {
+              results.errors.push(`Failed to add constraints to programming_tasks: ${error instanceof Error ? error.message : 'Unknown'}`)
             }
           }
         }
