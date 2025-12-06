@@ -221,6 +221,25 @@ function TaskPageContent() {
   }
   
   // Use type assertion to avoid deep type recursion
+  interface ExampleType {
+    input: unknown
+    output: unknown
+    explanation?: string
+  }
+
+  interface TestCaseType {
+    input?: unknown
+    output?: unknown
+    testCases?: TestCaseType[]
+  }
+
+  interface TestResultType {
+    passed: boolean
+    testCase?: unknown
+    expected?: unknown
+    error?: string
+  }
+
   const taskDataTyped = taskData as {
     title: string
     description: string
@@ -229,24 +248,24 @@ function TaskPageContent() {
     category: string
     hints?: string[]
     starterCode?: string | null
-    examples?: Array<{ input: any; output: any; explanation?: string }> | null
+    examples?: ExampleType[] | null
     constraints?: string[] | null
-    testCases?: any
+    testCases?: TestCaseType | TestCaseType[]
   }
 
   // Function to run tests on the code
-  const handleRunTests = async (code: string): Promise<{ passed: number; failed: number; results: any[] }> => {
+  const handleRunTests = async (code: string): Promise<{ passed: number; failed: number; results: TestResultType[] }> => {
     if (!taskDataTyped.testCases) {
       throw new Error('No test cases available for this task')
     }
 
     // This is a simplified test runner - in production, you'd want to use a proper code execution service
     // For now, we'll just validate the code structure and return mock results
-    const testCases = Array.isArray(taskDataTyped.testCases) 
+    const testCasesArray = Array.isArray(taskDataTyped.testCases) 
       ? taskDataTyped.testCases 
-      : taskDataTyped.testCases?.testCases || []
+      : (taskDataTyped.testCases as TestCaseType)?.testCases || []
 
-    const results = testCases.map((testCase: any, index: number) => {
+    const results: TestResultType[] = testCasesArray.map((testCase: TestCaseType) => {
       // Basic validation - check if code contains the function
       // In a real implementation, you'd execute the code in a sandbox
       const hasFunction = code.includes('function') || code.includes('const') || code.includes('let')
@@ -259,7 +278,7 @@ function TaskPageContent() {
       }
     })
 
-    const passed = results.filter((r: any) => r.passed).length
+    const passed = results.filter((r) => r.passed).length
     const failed = results.length - passed
 
     return { passed, failed, results }

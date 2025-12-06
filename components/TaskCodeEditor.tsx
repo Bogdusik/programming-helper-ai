@@ -4,9 +4,16 @@ import { useState, useEffect, useCallback } from 'react'
 import TaskDescription from './TaskDescription'
 
 interface Example {
-  input: string | Record<string, any>
-  output: string | any
+  input: string | number | boolean | null | Record<string, unknown> | unknown[]
+  output: string | number | boolean | null | Record<string, unknown> | unknown[]
   explanation?: string
+}
+
+interface TestResult {
+  passed: boolean
+  testCase?: unknown
+  expected?: unknown
+  error?: string
 }
 
 interface TaskCodeEditorProps {
@@ -19,12 +26,12 @@ interface TaskCodeEditorProps {
   starterCode?: string | null
   examples?: Example[] | null
   constraints?: string[] | null
-  testCases?: any
+  testCases?: unknown
   value: string
   onChange: (value: string) => void
   placeholder?: string
   height?: string
-  onRunTests?: (code: string) => Promise<{ passed: number; failed: number; results: any[] }>
+  onRunTests?: (code: string) => Promise<{ passed: number; failed: number; results: TestResult[] }>
 }
 
 export default function TaskCodeEditor({
@@ -37,7 +44,7 @@ export default function TaskCodeEditor({
   starterCode,
   examples,
   constraints,
-  testCases,
+  testCases: _testCases,
   value,
   onChange,
   placeholder = 'Write your solution here...',
@@ -49,7 +56,7 @@ export default function TaskCodeEditor({
   const [testResults, setTestResults] = useState<{
     passed: number
     failed: number
-    results: any[]
+    results: TestResult[]
   } | null>(null)
   const [isRunningTests, setIsRunningTests] = useState(false)
 

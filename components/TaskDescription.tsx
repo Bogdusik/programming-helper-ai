@@ -1,8 +1,8 @@
 'use client'
 
 interface Example {
-  input: string | Record<string, any>
-  output: string | any
+  input: string | number | boolean | null | Record<string, unknown> | unknown[]
+  output: string | number | boolean | null | Record<string, unknown> | unknown[]
   explanation?: string
 }
 
@@ -42,8 +42,8 @@ export default function TaskDescription({
     }
   }
 
-  const formatValue = (value: any): string => {
-    if (typeof value === 'object') {
+  const formatValue = (value: string | number | boolean | null | Record<string, unknown> | unknown[]): string => {
+    if (typeof value === 'object' && value !== null) {
       return JSON.stringify(value, null, 2)
     }
     return String(value)
