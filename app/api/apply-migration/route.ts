@@ -22,7 +22,7 @@ export async function POST() {
         success: true, 
         message: 'Migration already applied - columns exist' 
       })
-    } catch (error) {
+    } catch {
       // Columns don't exist, need to add them
       logger.info('Columns do not exist, applying migration...')
     }

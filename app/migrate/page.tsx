@@ -7,7 +7,7 @@ import MinimalBackground from '../../components/MinimalBackground'
 export default function MigratePage() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState<string>('')
-  const [details, setDetails] = useState<any>(null)
+  const [details, setDetails] = useState<Record<string, unknown> | null>(null)
 
   const handleMigrate = async () => {
     setStatus('loading')
@@ -50,7 +50,7 @@ export default function MigratePage() {
               This page will apply the database migration to add <code className="bg-gray-800 px-2 py-1 rounded">examples</code> and <code className="bg-gray-800 px-2 py-1 rounded">constraints</code> columns to the <code className="bg-gray-800 px-2 py-1 rounded">programming_tasks</code> table.
             </p>
             <p className="text-white/60 text-sm">
-              This migration is safe to run multiple times - it will only add columns if they don't already exist.
+              This migration is safe to run multiple times - it will only add columns if they don&apos;t already exist.
             </p>
           </div>
 
@@ -104,9 +104,9 @@ export default function MigratePage() {
               
               <p className="mt-4"><strong>3. Direct SQL (if you have database access):</strong></p>
               <code className="block bg-gray-900/50 p-2 rounded text-xs text-green-300">
-                ALTER TABLE "programming_tasks" <br/>
-                ADD COLUMN IF NOT EXISTS "examples" JSONB,<br/>
-                ADD COLUMN IF NOT EXISTS "constraints" TEXT[] DEFAULT ARRAY[]::TEXT[];
+                ALTER TABLE &quot;programming_tasks&quot; <br/>
+                ADD COLUMN IF NOT EXISTS &quot;examples&quot; JSONB,<br/>
+                ADD COLUMN IF NOT EXISTS &quot;constraints&quot; TEXT[] DEFAULT ARRAY[]::TEXT[];
               </code>
             </div>
           </div>
