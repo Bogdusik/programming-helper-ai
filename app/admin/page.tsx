@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import Navbar from '@/components/Navbar'
 import { trpc } from '@/lib/trpc-client'
-import type { AdminTask } from '@/lib/trpc-types'
 import { clientLogger } from '@/lib/client-logger'
 
 export default function AdminPage() {
@@ -89,6 +88,8 @@ export default function AdminPage() {
     },
   })
   
+  // Note: handleRefreshStats and handleClearCache are kept for potential future use
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleRefreshStats = () => {
     toast.promise(refetchStats(), {
       loading: 'Refreshing statistics...',
@@ -97,6 +98,7 @@ export default function AdminPage() {
     })
   }
   
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleClearCache = () => {
     toast((t) => (
       <div>
@@ -1039,6 +1041,8 @@ function TasksManagementModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
     },
   })
 
+  // Note: utils is kept for potential future use
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const utils = trpc.useUtils()
 
   if (!isOpen) return null
@@ -1730,8 +1734,8 @@ function ReportsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
 
 // Monitoring Modal Component
 function MonitoringModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const [logsPage, setLogsPage] = useState(1)
-  const [activityPage, setActivityPage] = useState(1)
+  const [logsPage] = useState(1)
+  const [activityPage] = useState(1)
   const [logLevel, setLogLevel] = useState<'error' | 'warn' | 'info' | undefined>()
 
   const { data: errorLogs, isLoading: errorLogsLoading } = trpc.admin.getErrorLogs.useQuery(
@@ -2327,7 +2331,7 @@ function UserComparisonTab({
       setCopiedUserId(userId)
       toast.success('User ID copied to clipboard!')
       setTimeout(() => setCopiedUserId(null), 2000)
-    } catch (error) {
+    } catch {
       toast.error('Failed to copy User ID')
     }
   }

@@ -1,17 +1,16 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import { useUser, SignOutButton } from '@clerk/nextjs'
 import Navbar from '../../components/Navbar'
 import MinimalBackground from '../../components/MinimalBackground'
 import { trpc } from '../../lib/trpc-client'
 import { useBlockedStatus, clearBlockStatusCache } from '../../hooks/useBlockedStatus'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import { clientLogger } from '../../lib/client-logger'
 
 export default function ContactPage() {
   const { isSignedIn, isLoaded, user } = useUser()
-  const router = useRouter()
   const hasClearedCacheRef = useRef(false)
   const [formData, setFormData] = useState({
     name: '',
@@ -50,7 +49,7 @@ export default function ContactPage() {
           setIsCheckingBlocked(false)
         })
         .catch(err => {
-          console.error('Error checking block status:', err)
+          clientLogger.error('Error checking block status:', err)
           setIsBlockedState(false)
           setIsCheckingBlocked(false)
         })
@@ -94,7 +93,7 @@ export default function ContactPage() {
         subject: formData.subject,
         message: formData.message,
       })
-    } catch (error) {
+    } catch {
       // Error is handled by onError callback
     }
   }

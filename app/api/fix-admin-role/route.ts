@@ -103,7 +103,7 @@ export async function GET() {
             logger.info('Making email column nullable', user.id)
             await db.$executeRawUnsafe(`ALTER TABLE users ALTER COLUMN email DROP NOT NULL`)
           }
-        } catch (emailError) {
+        } catch {
           // Email column might not exist, that's fine
           logger.info('Email column check skipped', user.id)
         }

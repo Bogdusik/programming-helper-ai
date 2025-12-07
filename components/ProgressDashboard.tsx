@@ -3,8 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { trpc } from '../lib/trpc-client'
-import { checkPostAssessmentEligibility, getPostAssessmentMessage } from '../lib/assessment-utils'
-import type { Assessment } from '../lib/trpc-types'
+import { getPostAssessmentMessage } from '../lib/assessment-utils'
 import AssessmentModal, { AssessmentQuestion } from './AssessmentModal'
 import { logger } from '../lib/logger'
 
@@ -17,9 +16,9 @@ export default function ProgressDashboard() {
     refetchOnWindowFocus: true, // Refetch when user returns to the page
     refetchOnMount: true, // Always refetch when component mounts to get latest stats
   })
-  const { data: languageProgress, isLoading: languageProgressLoading } = trpc.profile.getLanguageProgress.useQuery()
-  const { data: eligibility, isLoading: eligibilityLoading } = trpc.assessment.checkPostAssessmentEligibility.useQuery()
-  const { data: assessments, isLoading: assessmentsLoading } = trpc.assessment.getAssessments.useQuery()
+  const { data: languageProgress } = trpc.profile.getLanguageProgress.useQuery()
+  const { data: eligibility } = trpc.assessment.checkPostAssessmentEligibility.useQuery()
+  const { data: assessments } = trpc.assessment.getAssessments.useQuery()
   
   const getQuestionsMutation = trpc.assessment.getQuestions.useMutation()
   const submitAssessmentMutation = trpc.assessment.submitAssessment.useMutation()
@@ -65,7 +64,10 @@ export default function ProgressDashboard() {
   
   // Keep Assessment types for compatibility, but use simple data objects for calculations
   // Don't create Assessment objects to avoid deep type recursion - use data objects instead
+  // Note: preAssessment and postAssessment are kept for potential future use
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const preAssessment = preAssessmentData ? true : false
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const postAssessment = postAssessmentData ? true : false
   
   const improvement = useMemo((): number | null => {
@@ -118,7 +120,9 @@ export default function ProgressDashboard() {
       // Refresh page to show updated results
       window.location.reload()
     } catch (error) {
-      console.error('Error submitting assessment:', error)
+      logger.error('Error submitting assessment', userProfile?.id, {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
     }
   }
 

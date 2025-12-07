@@ -23,7 +23,7 @@ export default function Home() {
     enabled: isSignedIn && isLoaded,
   })
   const [showConsent, setShowConsent] = useState(false)
-  const [hasConsent, setHasConsent] = useState(false)
+  const [, setHasConsent] = useState(false)
   
   // Redirect blocked users to blocked page
   useEffect(() => {

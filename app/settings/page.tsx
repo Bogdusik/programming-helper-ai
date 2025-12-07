@@ -10,6 +10,7 @@ import UserProfileModal, { ProfileData } from '../../components/UserProfileModal
 import { trpc } from '../../lib/trpc-client'
 import { useBlockedStatus } from '../../hooks/useBlockedStatus'
 import toast from 'react-hot-toast'
+import { clientLogger } from '../../lib/client-logger'
 
 export default function SettingsPage() {
   const { isSignedIn, isLoaded } = useUser()
@@ -52,7 +53,7 @@ export default function SettingsPage() {
       await refetchProfile()
       toast.success('Profile updated successfully! 🎉')
     } catch (error) {
-      console.error('Error updating profile:', error)
+      clientLogger.error('Error updating profile:', error)
       toast.error('Failed to update profile. Please try again.')
     }
   }

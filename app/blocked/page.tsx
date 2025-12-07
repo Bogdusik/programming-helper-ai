@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import Link from 'next/link'
 import MinimalBackground from '../../components/MinimalBackground'
-import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function BlockedPage() {
   const { isSignedIn, isLoaded } = useUser()

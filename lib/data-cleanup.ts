@@ -1,4 +1,5 @@
 import { db } from './db'
+import { logger } from './logger'
 
 // Data retention policies
 const RETENTION_POLICIES = {
@@ -47,10 +48,11 @@ export async function cleanupOldData() {
       }
     })
 
-    console.log(`Data cleanup completed:
-      - Deleted ${deletedMessages.count} old messages
-      - Deleted ${deletedSessions.count} old sessions
-      - Deleted ${deletedStats.count} old stats`)
+    logger.info('Data cleanup completed', undefined, {
+      deletedMessages: deletedMessages.count,
+      deletedSessions: deletedSessions.count,
+      deletedStats: deletedStats.count
+    })
 
     return {
       deletedMessages: deletedMessages.count,
@@ -58,7 +60,9 @@ export async function cleanupOldData() {
       deletedStats: deletedStats.count
     }
   } catch (error) {
-    console.error('Error during data cleanup:', error)
+    logger.error('Error during data cleanup', undefined, {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    })
     throw error
   }
 }
@@ -86,10 +90,12 @@ export async function deleteUserData(userId: string) {
       where: { id: userId }
     })
 
-    console.log(`All data deleted for user: ${userId}`)
+    logger.info('All data deleted for user', userId)
     return true
   } catch (error) {
-    console.error(`Error deleting data for user ${userId}:`, error)
+    logger.error('Error deleting data for user', userId, {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    })
     throw error
   }
 }
@@ -114,10 +120,12 @@ export async function anonymizeUserData(userId: string) {
       }
     })
 
-    console.log(`Data anonymized for user: ${userId}`)
+    logger.info('Data anonymized for user', userId)
     return true
   } catch (error) {
-    console.error(`Error anonymizing data for user ${userId}:`, error)
+    logger.error('Error anonymizing data for user', userId, {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    })
     throw error
   }
 }

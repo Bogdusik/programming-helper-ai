@@ -21,12 +21,14 @@ const eslintConfig = [
       "coverage/**",
       "*.config.js",
       "*.config.mjs",
+      "scripts/**",
+      "__tests__/**",
     ],
   },
   {
     rules: {
       // Prevent console.* in production code - use logger instead
-      // Allow in test files and scripts (handled via overrides if needed)
+      // Allow in logger files, test files and scripts
       "no-console": "error",
       // Enforce consistent imports
       "no-unused-vars": "off", // TypeScript handles this
@@ -37,6 +39,13 @@ const eslintConfig = [
           varsIgnorePattern: "^_",
         },
       ],
+    },
+  },
+  // Allow console in logger files (they are meant to use console)
+  {
+    files: ["lib/logger.ts", "lib/client-logger.ts"],
+    rules: {
+      "no-console": "off",
     },
   },
 ];

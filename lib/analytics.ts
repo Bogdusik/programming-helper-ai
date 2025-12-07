@@ -1,4 +1,6 @@
 // Simple analytics and monitoring
+import { logger } from './logger'
+
 interface AnalyticsEvent {
   event: string
   userId?: string
@@ -24,10 +26,12 @@ class Analytics {
       this.sendToAnalytics(analyticsEvent)
     }
     
-    console.log('Analytics:', analyticsEvent)
+    // Log analytics event (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('Analytics event', analyticsEvent.userId, analyticsEvent.properties)
+    }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async sendToAnalytics(_event: AnalyticsEvent) {
     try {
       // Send to your analytics service (e.g., PostHog, Mixpanel, etc.)
@@ -36,7 +40,9 @@ class Analytics {
       //   body: JSON.stringify(event)
       // })
     } catch (error) {
-      console.error('Failed to send analytics:', error)
+      logger.error('Failed to send analytics', undefined, {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
     }
   }
 

@@ -10,6 +10,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import ProgressDashboard from '../../components/ProgressDashboard'
 import AssessmentModal, { AssessmentQuestion } from '../../components/AssessmentModal'
 import { trpc } from '../../lib/trpc-client'
+import { clientLogger } from '../../lib/client-logger'
 
 export default function StatsPage() {
   const { isSignedIn, isLoaded } = useUser()
@@ -19,7 +20,7 @@ export default function StatsPage() {
   
   // OPTIMIZATION: Add staleTime to cache data and improve navigation speed
   // But refetch on window focus to ensure stats are updated after completing tasks
-  const { data: stats, isLoading: statsLoading, error: statsError, refetch: refetchStats } = trpc.stats.getUserStats.useQuery(undefined, {
+  const { data: stats, isLoading: statsLoading, error: statsError } = trpc.stats.getUserStats.useQuery(undefined, {
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes
     refetchOnWindowFocus: true, // Refetch when user returns to the page
     refetchOnMount: true, // Always refetch when component mounts to get latest stats
@@ -45,6 +46,8 @@ export default function StatsPage() {
     return null
   }
 
+  // Note: handleTakePostAssessment is kept for potential future use
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleTakePostAssessment = async () => {
     try {
       const questions = await getQuestionsMutation.mutateAsync({
@@ -96,7 +99,7 @@ export default function StatsPage() {
       setAssessmentQuestions(transformedQuestions)
       setShowPostAssessment(true)
     } catch (error) {
-      console.error('Error loading assessment questions:', error)
+      clientLogger.error('Error loading assessment questions:', error)
     }
   }
 
@@ -116,7 +119,7 @@ export default function StatsPage() {
       // Refresh stats to show improvement
       window.location.reload()
     } catch (error) {
-      console.error('Error submitting assessment:', error)
+      clientLogger.error('Error submitting assessment:', error)
     }
   }
 

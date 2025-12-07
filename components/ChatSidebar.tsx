@@ -10,7 +10,7 @@ interface ChatSession {
   title: string
   createdAt: string | Date
   updatedAt: string | Date
-  messages: Array<{
+  messages?: Array<{
     id: string
     content: string
     role: string

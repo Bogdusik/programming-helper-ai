@@ -57,7 +57,6 @@ class Logger {
     this.log(LogLevel.DEBUG, message, userId, metadata)
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async sendToLoggingService(_entry: LogEntry) {
     // Send to your logging service (e.g., LogRocket, Sentry, etc.)
     // This is a placeholder for future implementation

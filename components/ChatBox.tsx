@@ -4,9 +4,8 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import Message from './Message'
 import { trpc } from '../lib/trpc-client'
-import type { TaskProgress } from '../lib/trpc-types'
 import { clientLogger } from '../lib/client-logger'
-import { getErrorMessage, requiresRefresh, isClerkNotFoundError } from '../lib/error-handler'
+import { getErrorMessage, requiresRefresh } from '../lib/error-handler'
 
 // Scroll animation constants
 const SCROLL_ANIMATION_DURATION_MS = 300 // Animation duration in milliseconds

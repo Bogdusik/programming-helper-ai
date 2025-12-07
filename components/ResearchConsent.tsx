@@ -8,7 +8,7 @@ interface ResearchConsentProps {
 
 export default function ResearchConsent({ onConsent }: ResearchConsentProps) {
   const [hasRead, setHasRead] = useState(false)
-  const [consentGiven, setConsentGiven] = useState(false)
+  const [, setConsentGiven] = useState(false)
 
   const handleConsent = (consent: boolean) => {
     setConsentGiven(consent)

@@ -297,7 +297,7 @@ export default function FAQPage() {
 
           {/* FAQ Items */}
           <div className="space-y-4">
-            {filteredFAQs.map((item, index) => {
+            {filteredFAQs.map((item) => {
               const globalIndex = faqData.findIndex(faq => faq === item)
               const isOpen = openItems.has(globalIndex)
               

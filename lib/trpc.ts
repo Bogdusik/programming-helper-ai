@@ -422,6 +422,8 @@ export const appRouter = router({
         const responseTime = (Date.now() - startTime) / 1000 // Convert to seconds
         
         // OPTIMIZATION: Batch database operations - create assistant message and update session in parallel
+        // Note: assistantMessage is kept for potential future use
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const [assistantMessage] = await Promise.all([
           // Create assistant message
           db.message.create({
@@ -719,9 +721,9 @@ export const appRouter = router({
             const errorMessage = error instanceof Error ? error.message : String(error)
             // Only log if it's a connection error (not other DB errors)
             if (errorMessage.includes('Can\'t reach database') || errorMessage.includes('connect')) {
-              console.warn('⚠️  Database connection issue - stats will show 0. Make sure PostgreSQL is running and run: npm run db:push')
+              logger.warn('Database connection issue - stats will show 0. Make sure PostgreSQL is running and run: npm run db:push', undefined)
             } else {
-              console.error('Error fetching global stats:', errorMessage)
+              logger.error('Error fetching global stats', undefined, { error: errorMessage })
             }
           }
           return {
@@ -2175,7 +2177,7 @@ export const appRouter = router({
           postTotal: number
         }>()
 
-        userAssessments.forEach((assessments, userId) => {
+        userAssessments.forEach((assessments) => {
           if (assessments.pre && assessments.post) {
             const preAnswers = Array.isArray(assessments.pre.answers)
               ? assessments.pre.answers as Array<{ questionId?: string; isCorrect?: boolean }>
@@ -2669,7 +2671,7 @@ export const appRouter = router({
                   question.type as 'code_snippet' | 'conceptual'
                 )
                 return { ...answer, isCorrect }
-              } catch (error) {
+              } catch {
                 // Fallback to client-provided value or case-insensitive comparison
                 const isCorrect = answer.isCorrect ?? 
                   (answer.answer.trim().toLowerCase() === question.correctAnswer.trim().toLowerCase())
@@ -2730,6 +2732,8 @@ export const appRouter = router({
               select: { assessedLevel: true },
             })
             
+            // Note: assessedLevel is kept for potential future use
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const assessedLevel = userProfile?.assessedLevel || 'beginner'
             
             // If pre-assessment was >= 80%, post-assessment should have used harder questions

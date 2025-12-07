@@ -262,6 +262,8 @@ function ChatPageContent() {
       // Only mark as initialized if messages are loaded (not loading) and we've checked them
       setTaskInitialized(true)
     }
+    // Note: taskData is intentionally excluded from dependencies to avoid deep type recursion
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskData?.id, currentSessionId, taskInitialized, isSignedIn, taskId, sessionIdFromUrl, existingMessages, isLoadingMessages, sendMessageMutation, updateProgressMutation, router, utils])
 
   // Separate useEffect specifically for Research Consent - highest priority

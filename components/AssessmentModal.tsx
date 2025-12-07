@@ -40,7 +40,7 @@ export default function AssessmentModal({
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [confidence, setConfidence] = useState(3)
-  const [timeStarted, setTimeStarted] = useState<Date | null>(null)
+  const [, setTimeStarted] = useState<Date | null>(null)
 
   useEffect(() => {
     if (isOpen) {

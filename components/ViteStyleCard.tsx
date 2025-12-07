@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, memo } from 'react'
+import { useState, useRef, memo } from 'react'
 
 interface ViteStyleCardProps {
   title: string
@@ -21,7 +21,7 @@ const ViteStyleCard = memo(function ViteStyleCard({
   features,
   className = '' 
 }: ViteStyleCardProps) {
-  const [isHovered, setIsHovered] = useState(false)
+  const [, setIsHovered] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const cardRef = useRef<HTMLDivElement>(null)
 

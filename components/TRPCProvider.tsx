@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { trpc } from '../lib/trpc-client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'

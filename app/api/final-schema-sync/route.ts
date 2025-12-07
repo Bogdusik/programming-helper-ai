@@ -97,7 +97,7 @@ export async function POST() {
             await db.$executeRawUnsafe(`ALTER TABLE users DROP COLUMN IF EXISTS "${col}" CASCADE`)
             results.removedColumns.push(col)
             logger.info(`Removed column ${col} from users table`, undefined)
-          } catch (error) {
+          } catch {
             // Ignore errors - column might be referenced
             logger.info(`Could not remove column ${col} (may be referenced)`, undefined)
           }
@@ -491,12 +491,12 @@ export async function POST() {
                 FOR EACH ROW
                 EXECUTE FUNCTION update_updated_at_column();
             `)
-          } catch (error) {
+          } catch {
             // Ignore trigger errors
           }
         }
       }
-    } catch (error) {
+    } catch {
       // Triggers are not critical
       logger.info('Trigger creation skipped', undefined)
     }

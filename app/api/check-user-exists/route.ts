@@ -26,7 +26,7 @@ export async function GET() {
         'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
       }
     })
-  } catch (error) {
+  } catch {
     // On error, assume user doesn't exist to be safe
     return NextResponse.json({ exists: false }, { 
       status: 200,
