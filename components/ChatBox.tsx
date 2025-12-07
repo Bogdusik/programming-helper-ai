@@ -134,9 +134,11 @@ export default function ChatBox({ sessionId, taskId, onSessionCreated, onTaskCom
     return progressArray.find((progress) => {
       const matchesSession = progress.chatSessionId === sessionId
       if (taskId) {
+        // If taskId is provided, find matching task regardless of status
         return matchesSession && progress.taskId === taskId
       }
-      return matchesSession && progress.status !== 'completed'
+      // If no taskId, prefer non-completed tasks, but also allow completed ones
+      return matchesSession
     }) || null
   }, [sessionId, taskId, allTaskProgress])
   
@@ -385,22 +387,49 @@ export default function ChatBox({ sessionId, taskId, onSessionCreated, onTaskCom
 
   return (
     <div className="flex flex-col h-full min-h-0" style={{ height: '100%', minHeight: 0, maxHeight: '100%' }}>
+      {/* Green completion bar for completed tasks - always visible at top */}
+      {currentTask && isTaskCompleted && (
+        <div className="bg-gradient-to-r from-green-600/30 to-green-500/30 border-l-4 border-green-500 rounded-r-lg p-4 mx-6 mt-6 mb-4 flex-shrink-0">
+          <div className="flex items-center space-x-3">
+            <svg className="h-6 w-6 text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1">
+              <div className="flex items-center space-x-2">
+                <span className="text-lg font-semibold text-green-300">Task Completed</span>
+                <span className="text-sm text-green-200/80">✓</span>
+              </div>
+              <p className="text-sm text-green-200/70 mt-1">Congratulations! You have successfully completed this task.</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div 
         ref={messagesContainerRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth"
         style={{ scrollBehavior: 'smooth' }}
       >
+
         {(!displayMessages || displayMessages.length === 0) && !isLoadingMessages && (
           <div className="text-center py-12">
             {currentTask ? (
               // Task-specific welcome message
               <div className="max-w-2xl mx-auto">
-                <div className="inline-flex items-center justify-center p-4 bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-2xl mb-4">
-                  <svg className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                  </svg>
-                </div>
+                {isTaskCompleted ? (
+                  <div className="inline-flex items-center justify-center p-4 bg-gradient-to-r from-green-500/30 to-green-600/30 rounded-2xl mb-4 border border-green-500/30">
+                    <svg className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center justify-center p-4 bg-gradient-to-r from-green-500/20 to-blue-500/20 rounded-2xl mb-4">
+                    <svg className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                    </svg>
+                  </div>
+                )}
                 <h3 className="text-2xl font-semibold text-white mb-3">{currentTask.title}</h3>
                 <div className="flex flex-wrap gap-2 justify-center mb-4">
                   <span className="px-3 py-1 bg-blue-500/20 text-blue-300 text-sm rounded-full capitalize">
@@ -412,9 +441,21 @@ export default function ChatBox({ sessionId, taskId, onSessionCreated, onTaskCom
                   <span className="px-3 py-1 bg-orange-500/20 text-orange-300 text-sm rounded-full capitalize">
                     {currentTask.category}
                   </span>
+                  {isTaskCompleted && (
+                    <span className="px-3 py-1 bg-green-500/30 text-green-300 text-sm rounded-full border border-green-500/50 flex items-center space-x-1">
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Completed</span>
+                    </span>
+                  )}
                 </div>
                 <p className="text-white/80 text-lg mb-4 leading-relaxed">{currentTask.description}</p>
-                <p className="text-white/50 text-sm">Work on this task with AI assistance. Ask questions, get hints, or request code reviews!</p>
+                {isTaskCompleted ? (
+                  <p className="text-green-300/80 text-sm font-medium">✓ This task has been completed. You can review your solution or ask questions about it!</p>
+                ) : (
+                  <p className="text-white/50 text-sm">Work on this task with AI assistance. Ask questions, get hints, or request code reviews!</p>
+                )}
               </div>
             ) : (
               // Default welcome message
