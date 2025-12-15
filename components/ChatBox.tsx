@@ -469,23 +469,6 @@ export default function ChatBox({ sessionId, taskId, onSessionCreated, onTaskCom
         {/* Invisible element for auto-scroll */}
         <div ref={messagesEndRef} />
         
-        {/* Scroll to bottom button */}
-        {!isUserAtBottom && displayMessages.length > 0 && (
-          <div className="flex justify-center">
-            <button
-              onClick={() => {
-                // Сначала скроллим принудительно к самому последнему сообщению,
-                // затем помечаем, что пользователь снова "внизу".
-                scrollToBottom({ force: true })
-                setIsUserAtBottom(true)
-              }}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 shadow-lg"
-            >
-              Scroll to bottom
-            </button>
-          </div>
-        )}
-        
         {sendMessageMutation.isPending && (
           <div className="flex justify-start">
             <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-white px-6 py-4 rounded-2xl rounded-bl-md">

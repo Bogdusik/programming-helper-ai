@@ -76,6 +76,21 @@ model Message {
   @@map("messages")
 }
 
+/// Cache for AI responses to avoid repeated OpenAI calls for identical questions
+model CachedAIResponse {
+  id        String   @id @default(cuid())
+  /// Deterministic hash key based on normalized message (and optionally context)
+  key       String   @unique
+  message   String
+  response  String
+  createdAt DateTime @default(now())
+  /// When this cached response should be considered stale
+  expiresAt DateTime
+
+  @@index([createdAt])
+  @@map("cached_ai_responses")
+}
+
 model Stats {
   id                       String   @id @default(cuid())
   userId                   String   @unique

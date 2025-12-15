@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { env } from '@/lib/env'
 
 /**
  * Health check endpoint
@@ -10,14 +11,18 @@ export async function GET() {
   try {
     // Check database connection
     await db.$queryRaw`SELECT 1`
-    
+
+    const services = {
+      database: 'connected' as const,
+      openai: process.env.OPENAI_API_KEY ? 'configured' as const : 'missing' as const,
+    }
+
     return NextResponse.json(
       {
         status: 'healthy',
         timestamp: new Date().toISOString(),
-        services: {
-          database: 'connected',
-        },
+        services,
+        environment: env.NODE_ENV,
       },
       { status: 200 }
     )

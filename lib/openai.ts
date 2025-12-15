@@ -1,7 +1,9 @@
 import OpenAI from 'openai'
+import crypto from 'crypto'
 import { getSystemPrompt } from './prompts'
 import { isProgrammingRelated, getRejectionMessage } from './programming-validator'
 import { logger } from './logger'
+import { db } from './db'
 
 // OpenAI API Configuration Constants
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
@@ -11,6 +13,9 @@ const OPENAI_MAX_TOKENS_ANALYSIS = 20 // Max tokens for analysis (title, questio
 const OPENAI_TEMPERATURE_RESPONSE = 0.7 // Temperature for chat responses
 const OPENAI_TEMPERATURE_ANALYSIS = 0.3 // Temperature for analysis tasks
 const CONVERSATION_HISTORY_LIMIT = 20 // Maximum number of messages in history
+
+// How long to keep cached responses (in milliseconds) - 7 days
+const OPENAI_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 if (!OPENAI_API_KEY) {
   logger.error('OPENAI_API_KEY is not set', undefined, {
@@ -32,6 +37,16 @@ function getOpenAIClient(): OpenAI {
     apiKey: OPENAI_API_KEY,
     timeout: OPENAI_TIMEOUT_MS,
   })
+}
+
+/**
+ * Create a stable cache key for a question (and optionally task context).
+ * For now we only cache when there's no conversation history and no task context
+ * to avoid returning stale or incorrect answers in multi-turn chats.
+ */
+function createCacheKey(message: string): string {
+  const normalized = message.trim().toLowerCase()
+  return crypto.createHash('sha256').update(normalized).digest('hex')
 }
 
 /**
@@ -61,6 +76,39 @@ export async function generateResponse(
       return getRejectionMessage()
     }
     
+    // Determine whether we can safely use cache:
+    // - Only for single-turn questions (no conversation history)
+    // - Only when there's no task-specific context
+    const canUseCache =
+      (!conversationHistory || conversationHistory.length === 0) &&
+      !taskContext
+
+    let cacheKey: string | null = null
+
+    if (canUseCache) {
+      cacheKey = createCacheKey(message)
+
+      try {
+        const now = new Date()
+        const cached = await db.cachedAIResponse.findUnique({
+          where: { key: cacheKey },
+        })
+
+        if (cached && cached.expiresAt > now) {
+          logger.debug('Serving response from OpenAI cache', undefined, {
+            cacheKey,
+          })
+          return cached.response
+        }
+      } catch (cacheError) {
+        // Cache failures should never break user flow
+        logger.warn('Failed to read from OpenAI cache', undefined, {
+          error:
+            cacheError instanceof Error ? cacheError.message : 'Unknown error',
+        })
+      }
+    }
+
     // Get specialized system prompt based on the message and conversation history
     let systemPrompt = getSystemPrompt(message, conversationHistory)
     
@@ -132,7 +180,41 @@ The goal is LEARNING, not just completing the task. Help them understand the con
       temperature: OPENAI_TEMPERATURE_RESPONSE,
     })
 
-    return completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response."
+    const responseText =
+      completion.choices[0]?.message?.content ||
+      "Sorry, I couldn't generate a response."
+
+    // Save to cache for future identical questions (best-effort, ignore failures)
+    if (canUseCache && cacheKey) {
+      try {
+        const now = new Date()
+        const expiresAt = new Date(now.getTime() + OPENAI_CACHE_TTL_MS)
+
+        await db.cachedAIResponse.upsert({
+          where: { key: cacheKey },
+          update: {
+            message,
+            response: responseText,
+            createdAt: now,
+            expiresAt,
+          },
+          create: {
+            key: cacheKey,
+            message,
+            response: responseText,
+            createdAt: now,
+            expiresAt,
+          },
+        })
+      } catch (cacheError) {
+        logger.warn('Failed to write to OpenAI cache', undefined, {
+          error:
+            cacheError instanceof Error ? cacheError.message : 'Unknown error',
+        })
+      }
+    }
+
+    return responseText
   } catch (error) {
     logger.error('OpenAI API error', undefined, {
       error: error instanceof Error ? error.message : 'Unknown error',
