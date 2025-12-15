@@ -195,7 +195,6 @@ The goal is LEARNING, not just completing the task. Help them understand the con
           update: {
             message,
             response: responseText,
-            createdAt: now,
             expiresAt,
           },
           create: {
