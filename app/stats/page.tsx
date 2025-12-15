@@ -11,10 +11,12 @@ import ProgressDashboard from '../../components/ProgressDashboard'
 import AssessmentModal, { AssessmentQuestion } from '../../components/AssessmentModal'
 import { trpc } from '../../lib/trpc-client'
 import { clientLogger } from '../../lib/client-logger'
+import { useUserRegistrationCheck } from '../../hooks/useUserRegistrationCheck'
 
 export default function StatsPage() {
   const { isSignedIn, isLoaded } = useUser()
   const router = useRouter()
+  const { isCheckingUserExists, hasCheckedUserExists } = useUserRegistrationCheck()
   const [showPostAssessment, setShowPostAssessment] = useState(false)
   const [assessmentQuestions, setAssessmentQuestions] = useState<AssessmentQuestion[]>([])
   
@@ -24,9 +26,10 @@ export default function StatsPage() {
     staleTime: 2 * 60 * 1000, // Cache for 2 minutes
     refetchOnWindowFocus: true, // Refetch when user returns to the page
     refetchOnMount: true, // Always refetch when component mounts to get latest stats
+    enabled: isSignedIn && isLoaded && hasCheckedUserExists && !isCheckingUserExists,
   })
   const { data: userProfile } = trpc.profile.getProfile.useQuery(undefined, {
-    enabled: isSignedIn,
+    enabled: isSignedIn && isLoaded && hasCheckedUserExists && !isCheckingUserExists,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   })
   const getQuestionsMutation = trpc.assessment.getQuestions.useMutation()
@@ -38,7 +41,7 @@ export default function StatsPage() {
     }
   }, [isLoaded, isSignedIn, router])
 
-  if (!isLoaded || statsLoading) {
+  if (!isLoaded || statsLoading || (isSignedIn && isCheckingUserExists)) {
     return <LoadingSpinner />
   }
 

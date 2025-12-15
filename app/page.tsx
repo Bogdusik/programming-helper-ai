@@ -13,6 +13,7 @@ import { trpc } from '../lib/trpc-client'
 import { hasGivenConsent, saveConsentToStorage } from '../lib/research-consent'
 import { formatTimeAgo } from '../lib/utils'
 import { useBlockedStatus } from '../hooks/useBlockedStatus'
+import { useUserRegistrationCheck } from '../hooks/useUserRegistrationCheck'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 export default function Home() {
@@ -22,6 +23,7 @@ export default function Home() {
     skipPaths: ['/blocked', '/contact'],
     enabled: isSignedIn && isLoaded,
   })
+  const { isCheckingUserExists, hasCheckedUserExists } = useUserRegistrationCheck()
   const [showConsent, setShowConsent] = useState(false)
   const [, setHasConsent] = useState(false)
   
@@ -47,11 +49,11 @@ export default function Home() {
 
   // Get user profile and onboarding status to determine if consent should be shown here
   const { data: userProfile } = trpc.profile.getProfile.useQuery(undefined, {
-    enabled: isSignedIn && isLoaded,
+    enabled: isSignedIn && isLoaded && hasCheckedUserExists && !isCheckingUserExists,
     staleTime: 5 * 60 * 1000,
   })
   const { data: onboardingStatus } = trpc.onboarding.getOnboardingStatus.useQuery(undefined, {
-    enabled: isSignedIn && isLoaded,
+    enabled: isSignedIn && isLoaded && hasCheckedUserExists && !isCheckingUserExists,
     staleTime: 10 * 60 * 1000,
   })
 
@@ -89,7 +91,7 @@ export default function Home() {
   }
 
   // Show loading while checking block status or redirecting
-  if (isSignedIn && (isCheckingBlocked || isBlocked)) {
+  if (isSignedIn && (isCheckingBlocked || isBlocked || isCheckingUserExists)) {
     return <LoadingSpinner />
   }
 

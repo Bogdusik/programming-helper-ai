@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import Logo from './Logo'
 import { trpc } from '@/lib/trpc-client'
 import { useBlockedStatus } from '../hooks/useBlockedStatus'
+import { useUserRegistrationCheck } from '../hooks/useUserRegistrationCheck'
 import { clientLogger } from '../lib/client-logger'
 
 const NAV_LINKS = [
@@ -19,6 +20,7 @@ export default function Navbar() {
   const { isSignedIn, user } = useUser()
   const pathname = usePathname()
   const [isScrolled, setIsScrolled] = useState(false)
+  const { isCheckingUserExists, hasCheckedUserExists } = useUserRegistrationCheck()
   // OPTIMIZATION: Use cached block status from BlockedCheck instead of making separate request
   // BlockedCheck already handles the check, we just need to know the result
   // This reduces API calls - Navbar will get status from cache or shared request
@@ -28,7 +30,7 @@ export default function Navbar() {
   })
   
   const { data: userRole, error: roleError } = trpc.auth.getMyRole.useQuery(undefined, {
-    enabled: isSignedIn,
+    enabled: isSignedIn && hasCheckedUserExists && !isCheckingUserExists,
     retry: false,
     refetchOnWindowFocus: false
   })
